@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "cerebrumma": {
+      "command": "/Users/benjaminperalta/.local/bin/uv",
+      "args": ["run", "--project", "/Users/benjaminperalta/cerebrumma/mcp_server", "cerebrumma-mcp"],
+      "cwd": "/Users/benjaminperalta/cerebrumma"
+    }
+  }
+}

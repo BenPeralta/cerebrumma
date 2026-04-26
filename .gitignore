@@ -1,0 +1,6 @@
+target/
+.cerebrum/
+mcp_server/.venv/
+mcp_server/__pycache__/
+*.pyc
+.DS_Store

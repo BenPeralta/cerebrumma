@@ -1,0 +1,12 @@
+{
+  "salience": {
+    "recency_weight": 0.4,
+    "relevance_weight": 0.4,
+    "importance_weight": 0.2
+  },
+  "dream_schedule": "nightly",
+  "equity": {
+    "auto_scan": true,
+    "bias_threshold": 0.7
+  }
+}
