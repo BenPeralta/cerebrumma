@@ -1,6 +1,8 @@
 target/
 .cerebrum/
+reflection-response.md
 mcp_server/.venv/
 mcp_server/__pycache__/
+mcp_server/src/*.egg-info/
 *.pyc
 .DS_Store

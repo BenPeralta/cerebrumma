@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::Utc;
 use clap::{Parser, Subcommand};
 use colored::*;
@@ -47,7 +47,11 @@ enum Commands {
         action: HookAction,
     },
     /// Reflect on episodic memory and promote insights (dream cycle)
-    Dream,
+    Dream {
+        /// Ingest an LLM reflection file and promote it into the Brain
+        #[arg(long, value_name = "FILE")]
+        ingest: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -92,7 +96,7 @@ async fn main() -> Result<()> {
             HookAction::Install => hook_install(),
             HookAction::Remove => hook_remove(),
         },
-        Commands::Dream => dream_cycle(),
+        Commands::Dream { ingest } => dream_cycle(ingest),
     }
 }
 
@@ -346,18 +350,12 @@ fn hook_remove() -> Result<()> {
 
 // ── Dream Cycle ───────────────────────────────────────────────────────────────
 
-fn dream_cycle() -> Result<()> {
-    let brain = active_brain()
-        .ok_or_else(|| anyhow::anyhow!("No Brain found. Run {} first.", "cerebrum init".yellow()))?;
-
-    println!("{}", "Dream cycle starting...".bright_magenta().bold());
-
-    let episodic_dir = brain.join("memory/episodic");
-    let semantic_dir = brain.join("memory/semantic");
-    let dream_dir = brain.join("dream");
-
-    // Collect all episodic entries (skip welcome + already-dreamed)
-    let mut entries: Vec<(PathBuf, String)> = fs::read_dir(&episodic_dir)?
+fn load_episodes(brain: &PathBuf) -> Vec<(PathBuf, String)> {
+    let dir = brain.join("memory/episodic");
+    if !dir.exists() { return vec![]; }
+    let mut entries: Vec<(PathBuf, String)> = fs::read_dir(&dir)
+        .into_iter()
+        .flatten()
         .filter_map(|e| e.ok())
         .filter(|e| {
             let name = e.file_name();
@@ -369,79 +367,189 @@ fn dream_cycle() -> Result<()> {
             fs::read_to_string(&path).ok().map(|text| (path, text))
         })
         .collect();
+    entries.sort_by_key(|(p, _)| p.clone());
+    entries
+}
 
-    if entries.is_empty() {
+fn build_reflection_prompt(episodes: &[(PathBuf, String)]) -> String {
+    let body = episodes.iter().take(20)
+        .map(|(path, text)| {
+            let name = path.file_name().unwrap_or_default().to_string_lossy();
+            format!("### {name}\n{text}")
+        })
+        .collect::<Vec<_>>()
+        .join("\n---\n");
+
+    format!(
+        r#"You are an expert memory curator for Cerebrumma.
+
+Review these recent episodic memories and produce a structured reflection.
+Return EXACTLY these four sections (keep the headers verbatim):
+
+## Key Insights
+- (3-7 concise bullet points of patterns or facts worth keeping long-term)
+
+## New Rules
+- (extract concrete best practices or protocols to follow going forward)
+
+## Equity & Bias Notes
+- (any language, assumptions, or patterns to avoid or reinforce for fairness)
+
+## Prune Suggestions
+- (filenames or entries that are low-value and can be archived)
+
+---
+## Episodic Memories
+
+{body}
+"#
+    )
+}
+
+fn dream_cycle(ingest: Option<PathBuf>) -> Result<()> {
+    // ── Ingest mode: parse LLM reflection and promote ──────────────────────────
+    if let Some(ref ingest_path) = ingest {
+        return ingest_reflection(ingest_path);
+    }
+
+    // ── Generate mode: load episodes + write prompt ────────────────────────────
+    println!("{}", "Dream cycle starting...".bright_magenta().bold());
+
+    let global = global_brain_path();
+    let local  = local_brain_path();
+
+    let mut all_entries: Vec<(PathBuf, String)> = vec![];
+    all_entries.extend(load_episodes(&local));
+    all_entries.extend(load_episodes(&global));
+
+    if all_entries.is_empty() {
         println!("   {} No new episodic entries to reflect on.", "→".dimmed());
-        println!("   {} Add entries with {} first.", "→".dimmed(), "cerebrum add".yellow());
+        println!("   {} Add some with {}.", "→".dimmed(), "cerebrum add \"...\"".yellow());
         return Ok(());
     }
 
-    println!("   {} Found {} episodic entries to reflect on", "→".dimmed(), entries.len());
+    println!("   {} {} episodic entries loaded", "→".dimmed(), all_entries.len());
 
-    // Build a digest of all entries
-    let digest: String = entries
-        .iter()
-        .map(|(path, text)| {
-            let filename = path.file_name().unwrap_or_default().to_string_lossy();
-            format!("### {filename}\n{text}\n")
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
+    let stem = ts_stem(&Utc::now().to_rfc3339());
 
-    // Write digest to dream/ staging area
-    let ts: String = Utc::now()
-        .to_rfc3339()
-        .chars()
-        .map(|c| if c == ':' { '_' } else { c })
-        .collect();
-    let stem = &ts[..ts.find('.').unwrap_or(19).min(19)];
-    let dream_file = dream_dir.join(format!("{stem}-digest.md"));
+    // Write the reflection prompt
+    let dream_dir = active_brain()
+        .ok_or_else(|| anyhow::anyhow!("No Brain found."))?
+        .join("dream");
+    fs::create_dir_all(&dream_dir)?;
+    let prompt_path = dream_dir.join(format!("{stem}-reflection-prompt.md"));
+    fs::write(&prompt_path, build_reflection_prompt(&all_entries))?;
 
-    let dream_content = format!(
-        "---\ntimestamp: {}\ntype: dream-digest\nentry_count: {}\n---\n\n{digest}",
-        Utc::now().to_rfc3339(),
-        entries.len()
-    );
-    fs::write(&dream_file, &dream_content)?;
-
-    println!("   {} Digest written → {}", "→".dimmed(), dream_file.display());
-
-    // Promote a summary to semantic memory
-    let summary_path = semantic_dir.join(format!("{stem}-dream-summary.md"));
-    let summary = Entry {
-        timestamp: Utc::now().to_rfc3339(),
-        source_tool: "dream".to_string(),
-        salience_score: 0.8,
-        bias_flag: false,
-        provenance: format!("dream-digest:{stem}"),
-        content: format!(
-            "Dream summary: reflected on {} episodic entries. Digest stored at dream/{}-digest.md. Review and promote key insights to semantic/ or procedural/ manually.",
-            entries.len(),
-            stem
-        ),
-    };
-    write_entry(&summary_path, &summary)?;
-
-    // Mark source entries as dreamed (rename with -dreamed suffix)
-    let mut promoted = 0;
-    for (path, _) in &mut entries {
-        let new_name = path
-            .file_stem()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string()
-            + "-dreamed.md";
-        let new_path = episodic_dir.join(new_name);
+    // Archive processed episodic entries
+    let mut archived = 0;
+    for (path, _) in &all_entries {
+        let stem_name = path.file_stem().unwrap_or_default().to_string_lossy();
+        let new_path = path.parent().unwrap().join(format!("{stem_name}-dreamed.md"));
         fs::rename(path, new_path)?;
-        promoted += 1;
+        archived += 1;
     }
 
-    println!("   {} {} entries archived (renamed -dreamed)", "→".dimmed(), promoted);
-    println!("   {} Summary promoted to semantic memory", "→".dimmed());
-    println!("\n{}", "Dream complete.".bright_magenta().bold());
-    println!("   Next: review {} and promote key insights manually.", "dream/".yellow());
+    println!("   {} {} entries archived", "→".dimmed(), archived);
+    println!("   {} Reflection prompt → {}", "→".dimmed(), prompt_path.display());
+    println!();
+    println!("{}", "Next steps:".bold());
+    println!("   1. Open {} and paste it into Claude/Grok", prompt_path.display());
+    println!("   2. Save the LLM's response as a .md file");
+    println!("   3. Run: {}", format!("cerebrum dream --ingest <response.md>").yellow());
 
     Ok(())
+}
+
+fn ingest_reflection(path: &PathBuf) -> Result<()> {
+    let brain = active_brain()
+        .ok_or_else(|| anyhow::anyhow!("No Brain found. Run {} first.", "cerebrum init".yellow()))?;
+
+    let content = fs::read_to_string(path)
+        .with_context(|| format!("Could not read {}", path.display()))?;
+
+    println!("{}", "Ingesting reflection...".bright_magenta().bold());
+
+    let stem = ts_stem(&Utc::now().to_rfc3339());
+    let mut promoted = 0;
+
+    // Parse each section and route to the right layer
+    let sections = parse_reflection_sections(&content);
+
+    if let Some(insights) = sections.get("Key Insights") {
+        let p = brain.join("memory/semantic").join(format!("{stem}-insights.md"));
+        let entry = Entry {
+            timestamp: Utc::now().to_rfc3339(),
+            source_tool: "dream".to_string(),
+            salience_score: 0.85,
+            bias_flag: false,
+            provenance: format!("dream-ingest:{}", path.file_name().unwrap_or_default().to_string_lossy()),
+            content: insights.join("\n"),
+        };
+        write_entry(&p, &entry)?;
+        println!("   {} {} insights → semantic/", "→".dimmed(), insights.len());
+        promoted += insights.len();
+    }
+
+    if let Some(rules) = sections.get("New Rules") {
+        let p = brain.join("memory/procedural/skills").join(format!("{stem}-rules.md"));
+        let entry = Entry {
+            timestamp: Utc::now().to_rfc3339(),
+            source_tool: "dream".to_string(),
+            salience_score: 0.9,
+            bias_flag: false,
+            provenance: format!("dream-ingest:{}", path.file_name().unwrap_or_default().to_string_lossy()),
+            content: rules.join("\n"),
+        };
+        write_entry(&p, &entry)?;
+        println!("   {} {} rules → procedural/skills/", "→".dimmed(), rules.len());
+        promoted += rules.len();
+    }
+
+    if let Some(equity) = sections.get("Equity & Bias Notes") {
+        let p = brain.join("memory/personal").join(format!("{stem}-equity.md"));
+        let entry = Entry {
+            timestamp: Utc::now().to_rfc3339(),
+            source_tool: "dream".to_string(),
+            salience_score: 0.9,
+            bias_flag: false,
+            provenance: format!("dream-ingest:{}", path.file_name().unwrap_or_default().to_string_lossy()),
+            content: equity.join("\n"),
+        };
+        write_entry(&p, &entry)?;
+        println!("   {} {} notes → personal/", "→".dimmed(), equity.len());
+        promoted += equity.len();
+    }
+
+    if let Some(prune) = sections.get("Prune Suggestions") {
+        println!("   {} {} prune suggestions (review manually):", "→".dimmed(), prune.len());
+        for item in prune {
+            println!("      • {}", item.dimmed());
+        }
+    }
+
+    println!("\n{} {} items promoted into your Brain.", "Dream complete.".bright_magenta().bold(), promoted);
+    Ok(())
+}
+
+fn parse_reflection_sections(content: &str) -> std::collections::HashMap<String, Vec<String>> {
+    let mut map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    let mut current_section = String::new();
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        // Detect section headers: ## Key Insights or **Key Insights**
+        if let Some(header) = trimmed.strip_prefix("## ") {
+            current_section = header.trim().to_string();
+        } else if trimmed.starts_with("- ") || trimmed.starts_with("• ") || trimmed.starts_with("* ") {
+            if !current_section.is_empty() {
+                let bullet = trimmed[2..].trim().to_string();
+                if !bullet.is_empty() {
+                    map.entry(current_section.clone()).or_default().push(bullet);
+                }
+            }
+        }
+    }
+    map
 }
 
 // ── Watcher ───────────────────────────────────────────────────────────────────
