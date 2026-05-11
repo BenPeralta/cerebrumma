@@ -7,7 +7,7 @@ Cerebrumma is a portable, git-tracked AI memory layer for developers. It lives i
 ## Install
 
 ```sh
-curl -fsSL https://get.cerebrumma.com | sh
+curl -fsSL http://get.cerebrumma.com | sh
 ```
 
 Installs the `cerebrum` CLI, MCP server, and configures Claude Code automatically. Requires macOS or Linux — Rust and uv are installed for you if missing.
