@@ -4,7 +4,7 @@
 set -e
 
 REPO="https://github.com/BenPeralta/cerebrumma"
-MCP_CONFIG_CLAUDE="$HOME/.claude/settings.json"
+CLAUDE_JSON="$HOME/.claude.json"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -82,42 +82,31 @@ ok "MCP server installed → $MCP_DEST"
 
 # ── 6. Configure Claude Code (optional) ──────────────────────────────────────
 configure_claude() {
-  if [ ! -f "$MCP_CONFIG_CLAUDE" ]; then
+  # Check if claude CLI is available
+  if ! command -v claude >/dev/null 2>&1; then
+    warn "Claude Code CLI not found — skipping MCP auto-config"
+    warn "After installing Claude Code, run: claude mcp add cerebrumma -s user $MCP_DEST/run-mcp.sh"
     return
   fi
 
-  if grep -q "cerebrumma" "$MCP_CONFIG_CLAUDE" 2>/dev/null; then
+  # Check if already configured
+  if grep -q "cerebrumma" "$CLAUDE_JSON" 2>/dev/null; then
     ok "Claude Code already configured"
     return
   fi
 
-  UV_BIN=$(command -v uv || echo "uv")
+  # Write wrapper script (avoids --project flag clash with claude mcp add parser)
+  WRAPPER="$HOME/.cerebrumma/run-mcp.sh"
+  UV_BIN=$(command -v uv || echo "$HOME/.local/bin/uv")
+  printf '#!/bin/sh\n%s run --project %s cerebrumma-mcp\n' "$UV_BIN" "$MCP_DEST" > "$WRAPPER"
+  chmod +x "$WRAPPER"
 
-  # Inject mcpServers block with Python to avoid dependency on jq
-  python3 - "$MCP_CONFIG_CLAUDE" "$UV_BIN" "$MCP_DEST" <<'PYEOF'
-import sys, json
-path, uv, mcp = sys.argv[1], sys.argv[2], sys.argv[3]
-with open(path) as f:
-    cfg = json.load(f)
-cfg.setdefault("mcpServers", {})["cerebrumma"] = {
-    "command": uv,
-    "args": ["run", "--project", mcp, "cerebrumma-mcp"],
-    "cwd": str(__import__("pathlib").Path.home())
-}
-with open(path, "w") as f:
-    json.dump(cfg, f, indent=2)
-    f.write("\n")
-PYEOF
-
+  claude mcp add cerebrumma -s user "$WRAPPER"
   ok "Claude Code configured — restart Claude Code to load the Brain"
 }
 
-if [ -f "$MCP_CONFIG_CLAUDE" ]; then
-  info "Configuring Claude Code MCP integration..."
-  configure_claude
-else
-  warn "Claude Code settings not found — skipping MCP auto-config"
-fi
+info "Configuring Claude Code MCP integration..."
+configure_claude
 
 # ── 7. Initialize global Brain ────────────────────────────────────────────────
 if [ ! -d "$HOME/.cerebrum" ]; then
