@@ -9,8 +9,9 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::cli::DaemonAction;
+use crate::config::Stats;
 use crate::dreamer::dream_cycle;
-use crate::memory::{active_brain, make_episodic_path, write_entry, Entry};
+use crate::memory::{active_brain, global_brain_path, make_episodic_path, write_entry, Entry};
 
 const WATCHED_EXTENSIONS: &[&str] = &[
     ".rs", ".ts", ".tsx", ".js", ".jsx", ".go", ".py", ".md", ".toml", ".yaml", ".yml", ".json",
@@ -110,31 +111,71 @@ pub async fn watch_daemon() -> Result<()> {
     Ok(())
 }
 
+// Auto-dream fires only when there are this many *fresh* (un-dreamed) memories…
+const DREAM_SATURATION_THRESHOLD: usize = 10;
+// …and never more often than this, so a burst of commits can't spam the API.
+const DREAM_COOLDOWN_HOURS: i64 = 6;
+
 pub async fn check_dream_saturation(brain: &PathBuf) -> Result<()> {
     let episodic_dir = brain.join("memory/episodic");
     if !episodic_dir.exists() {
         return Ok(());
     }
 
+    // Count only FRESH episodes — exclude already-dreamed archives and the
+    // welcome file — so the count resets after each dream instead of staying
+    // permanently over the threshold and re-triggering on every new memory.
     let count = fs::read_dir(&episodic_dir)?
         .filter_map(|e| e.ok())
-        .filter(|e| e.file_name().to_string_lossy().ends_with(".md"))
+        .filter(|e| {
+            let name = e.file_name();
+            let s = name.to_string_lossy();
+            s.ends_with(".md") && !s.contains("-dreamed") && !s.starts_with("000-")
+        })
         .count();
 
-    if count >= 10 {
+    if count < DREAM_SATURATION_THRESHOLD {
+        return Ok(());
+    }
+
+    // Max-frequency cap: skip if we already dreamed within the cooldown window.
+    if let Some(remaining) = dream_cooldown_remaining() {
         println!(
-            "\n{} Brain is saturated with {} new experiences. Triggering auto dream cycle...",
-            "✧".bright_magenta().bold(),
-            count
+            "\n{} {} fresh memories ready, but auto-dream is on cooldown ({} left).",
+            "✧".dimmed(),
+            count,
+            remaining
         );
-        // We use auto=true here because this is usually called from background/daemon
-        // If config is missing, it will just log an error in the daemon output
-        if let Err(e) = dream_cycle(None, true).await {
-            eprintln!("{} Auto-dream failed: {}", "×".red(), e);
-        }
+        return Ok(());
+    }
+
+    println!(
+        "\n{} Brain is saturated with {} new experiences. Triggering auto dream cycle...",
+        "✧".bright_magenta().bold(),
+        count
+    );
+    // auto=true: called from the background daemon; a missing key just logs below.
+    if let Err(e) = dream_cycle(None, true).await {
+        eprintln!("{} Auto-dream failed: {}", "×".red(), e);
     }
 
     Ok(())
+}
+
+/// If the last auto-dream was within the cooldown window, return a human-readable
+/// "time remaining"; otherwise return None (safe to dream now).
+fn dream_cooldown_remaining() -> Option<String> {
+    let stats_path = global_brain_path().join("stats.json");
+    let stats: Stats = serde_json::from_str(&fs::read_to_string(&stats_path).ok()?).ok()?;
+    let last_dt = chrono::DateTime::parse_from_rfc3339(&stats.last_dream_at?).ok()?;
+    let elapsed = Utc::now().signed_duration_since(last_dt.with_timezone(&Utc));
+    let left = chrono::Duration::hours(DREAM_COOLDOWN_HOURS) - elapsed;
+    if left > chrono::Duration::zero() {
+        let mins = left.num_minutes().max(1);
+        Some(format!("{}h {}m", mins / 60, mins % 60))
+    } else {
+        None
+    }
 }
 
 pub fn run_daemon_cmd(action: DaemonAction) -> Result<()> {

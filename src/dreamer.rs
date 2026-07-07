@@ -165,7 +165,9 @@ pub async fn run_auto_dream() -> Result<()> {
                 anyhow::anyhow!("Gemini API key not found. Run: cerebrum config set gemini_key <KEY>")
             })?;
 
-            let url = format!("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={}", api_key);
+            // Pinned stable Flash model (the "-latest" alias currently resolves to
+            // an overloaded newer model that returns 503).
+            let url = format!("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={}", api_key);
             let payload = serde_json::json!({
                 "contents": [{
                     "parts": [{
