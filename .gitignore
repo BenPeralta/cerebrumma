@@ -1,5 +1,6 @@
 target/
 .cerebrum/
+.fastembed_cache/
 reflection-response.md
 .claude/
 mcp_server/.venv/

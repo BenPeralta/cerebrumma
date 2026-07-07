@@ -25,11 +25,17 @@ cd ~/my-project
 cerebrum init
 cerebrum hook install        # auto-capture every git commit
 
+# Start the background gardener (macOS launchd)
+cerebrum daemon start
+
 # See what your Brain knows
 cerebrum status
 
-# Run a dream cycle (compress + reflect + self-improve)
-cerebrum dream
+# Let the Brain reflect and self-improve (calls LLM directly)
+cerebrum dream --auto
+
+# View a beautiful dashboard of your Brain
+cerebrum map
 ```
 
 ## How It Works
@@ -43,7 +49,7 @@ Memory lives in five layers inside `.cerebrum/`:
 │   ├── semantic/       ← distilled facts and knowledge
 │   ├── procedural/     ← skills and protocols (rules you follow)
 │   └── personal/       ← equity rules and preferences
-├── embeddings/         ← local vector index (coming soon)
+├── embeddings.db       ← local vector index (sqlite-vec)
 ├── logs/               ← audit trail
 └── dream/              ← reflection staging area
 ```
@@ -61,10 +67,17 @@ Every entry is plain Markdown with YAML frontmatter — human-readable, git-diff
 | `cerebrum status` | Show entry counts across all memory layers |
 | `cerebrum hook install` | Install git post-commit hook (auto-captures commits) |
 | `cerebrum hook remove` | Remove the hook |
-| `cerebrum watch` | Watch for file saves and auto-capture |
+| `cerebrum daemon start` | Start the background watcher and auto-dreamer |
+| `cerebrum watch` | Watch for file saves (foreground) |
 | `cerebrum dream` | Archive episodes + generate LLM reflection prompt |
-| `cerebrum dream --ingest <file>` | Parse LLM reflection into the right memory layers |
-| `cerebrum template --list` | List available community templates |
+| `cerebrum dream --auto` | Automatically call LLM (Gemini/Claude) and ingest |
+| `cerebrum map` | Open a beautiful HTML visualization of your Brain |
+| `cerebrum brief` | Generate a "State of the Union" context file |
+| `cerebrum fix` | View actionable technical debt and prune suggestions |
+| `cerebrum audit` | Audit brain health and decay |
+| `cerebrum search <query>` | Semantic search across the Brain |
+| `cerebrum why <query>` | Contextual trace explaining "why" a rule exists |
+| `cerebrum config` | Set LLM providers and API keys |
 
 ## Global + Local Brain Hierarchy
 
@@ -94,14 +107,20 @@ Cerebrumma runs as a local MCP server. Claude Code, Cursor, and Antigravity can 
 
 Available MCP tools: `read_memory` · `search_memory` · `get_protocols` · `add_entry` · `get_status`
 
-## Dream Cycle
+## Dream Cycle (Autopilot Gardener)
 
-The self-improvement loop that turns a raw log into a learning system:
+The Brain can self-improve on autopilot. First, configure your LLM provider (keys are stored securely in `~/.cerebrum/config.json`):
 
 ```sh
-cerebrum dream                        # archives episodes, writes reflection prompt
-# paste prompt into Claude / Grok / any LLM, save response as response.md
-cerebrum dream --ingest response.md   # promotes insights into the right layers
+cerebrum config set provider gemini
+cerebrum config set api_key YOUR_API_KEY
+```
+
+Then, trigger a dream cycle manually or let the background daemon handle it:
+
+```sh
+cerebrum dream --auto                 # runs reflection right now
+cerebrum daemon start                 # triggers automatically after 10 saturation points
 ```
 
 The LLM reflection is parsed into four sections:
@@ -111,7 +130,7 @@ The LLM reflection is parsed into four sections:
 | Key Insights | `semantic/` |
 | New Rules | `procedural/skills/` |
 | Equity & Bias Notes | `personal/` |
-| Prune Suggestions | Printed for manual review — never auto-deleted |
+| Prune Suggestions | Viewed later using `cerebrum fix` |
 
 ## Memory Format
 
@@ -129,15 +148,17 @@ Always prefer functional components in React.
 
 ## Roadmap
 
-- [x] CLI: `init`, `add`, `status`, `hook`, `watch`, `dream`, `template`
+- [x] CLI: `init`, `add`, `status`, `hook`, `watch`, `dream`, `map`, `fix`, `brief`
 - [x] Global + local Brain hierarchy
 - [x] MCP server (5 tools, merges both Brains)
 - [x] Git hook auto-capture (branch + hash + diff stats)
-- [x] Dream cycle with `--ingest` parsing
-- [ ] SQLite-vec embeddings + semantic search
-- [ ] `cerebrum why` — full trace with memory IDs
+- [x] Autopilot Dreaming (`dream --auto`) via Gemini/Claude
+- [x] Background Daemon (`launchd`)
+- [x] SQLite-vec embeddings + semantic search
+- [x] Visual Brain Dashboard (`map`)
 - [ ] Templates marketplace
 - [ ] Cloud sync (Pro — $24/mo)
+- [ ] Team Brain (shared repo sync)
 
 ## License
 

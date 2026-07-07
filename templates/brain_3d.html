@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cerebrumma · {{project_name}}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:'Outfit',system-ui,sans-serif}
+canvas{display:block}
+
+#loading{
+  position:fixed;inset:0;background:#000;z-index:200;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.2rem;
+  transition:opacity .8s
+}
+.ld-logo{font-size:1.1rem;font-weight:700;letter-spacing:.18em;color:rgba(0,212,255,.8);text-transform:uppercase}
+.ld-bar{width:220px;height:1px;background:rgba(255,255,255,.08);overflow:hidden;position:relative}
+.ld-fill{height:100%;background:linear-gradient(90deg,#00d4ff,#8855ff,#ff44aa);animation:ldfill 1.8s ease-out forwards}
+@keyframes ldfill{from{width:0}to{width:100%}}
+
+#ui{position:fixed;inset:0;pointer-events:none}
+
+/* top bar */
+#topbar{
+  position:absolute;top:0;left:0;right:0;
+  padding:1.4rem 2.2rem;
+  display:flex;align-items:center;justify-content:space-between;
+  background:linear-gradient(to bottom,rgba(0,0,0,.75),transparent)
+}
+.brand{display:flex;align-items:center;gap:.9rem}
+.pulse-dot{
+  width:10px;height:10px;border-radius:50%;
+  background:#eb5e28;
+  box-shadow:0 0 10px #eb5e28,0 0 20px rgba(235,94,40,.4);
+  animation:pdot 2.2s ease-in-out infinite
+}
+@keyframes pdot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:.6}}
+.brand-name{font-size:1.05rem;font-weight:700;letter-spacing:.1em;color:#fff;text-transform:uppercase}
+.brand-tag{font-size:.6rem;letter-spacing:.22em;color:rgba(0,212,255,.6);text-transform:uppercase;margin-top:.1rem}
+.stats{font-size:.68rem;color:rgba(148,163,184,.45);letter-spacing:.08em;text-transform:uppercase;margin-top:.2rem}
+.stats b{color:rgba(235,94,40,.9);font-weight:600}
+
+/* legend */
+#legend{
+  position:absolute;bottom:2rem;left:2rem;
+  background:rgba(4,4,20,.82);backdrop-filter:blur(22px);
+  border:1px solid rgba(255,255,255,.06);border-radius:16px;
+  padding:.95rem 1.2rem;display:flex;flex-direction:column;gap:.55rem
+}
+.lt{font-size:.56rem;text-transform:uppercase;letter-spacing:.14em;color:rgba(148,163,184,.38);margin-bottom:.1rem}
+.lr{display:flex;align-items:center;gap:.6rem;font-size:.77rem;color:rgba(148,163,184,.6)}
+.ld{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* hint */
+#hint{
+  position:absolute;bottom:2rem;right:2rem;
+  font-size:.64rem;color:rgba(148,163,184,.3);text-align:right;line-height:1.9
+}
+kbd{
+  font-family:monospace;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.07);border-radius:4px;
+  padding:.02rem .38rem;color:rgba(203,213,225,.35)
+}
+
+/* node label */
+#tip{
+  position:fixed;pointer-events:none;z-index:50;
+  background:rgba(4,4,22,.94);backdrop-filter:blur(22px);
+  border:1px solid rgba(0,212,255,.18);border-radius:13px;
+  padding:.7rem 1rem;max-width:290px;
+  opacity:0;transition:opacity .12s;
+  box-shadow:0 0 30px rgba(0,212,255,.08),0 18px 50px rgba(0,0,0,.85);
+  transform:translate(-50%,calc(-100% - 18px))
+}
+#tip .ty{font-size:.58rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-bottom:.3rem}
+#tip .tx{font-size:.8rem;color:rgba(226,232,240,.85);line-height:1.4}
+#tip .tm{margin-top:.45rem;font-size:.62rem;color:rgba(148,163,184,.45);display:flex;gap:.9rem}
+
+/* ── List panel ── */
+#topbar{ right:340px }
+#hint{ right:360px }
+#panel{
+  position:fixed; top:0; right:0; bottom:0; width:340px; z-index:40;
+  background:rgba(4,4,20,.82); backdrop-filter:blur(24px);
+  border-left:1px solid rgba(255,255,255,.06);
+  display:flex; flex-direction:column;
+}
+#phead{ padding:1.3rem 4.5rem 1rem 1.2rem; border-bottom:1px solid rgba(255,255,255,.05) }
+#search{
+  width:100%; padding:.6rem 1.1rem; font-family:inherit; font-size:.82rem;
+  color:#e2e8f0; background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.08); border-radius:99px; outline:none;
+}
+#search::placeholder{ color:rgba(148,163,184,.4) }
+#search:focus{ border-color:rgba(235,94,40,.55) }
+#list{ flex:1; overflow-y:auto; padding:0 .8rem .8rem }
+#list::-webkit-scrollbar{ width:8px }
+#list::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.08); border-radius:4px }
+.lgroup{ margin-bottom:.9rem }
+.lgh{
+  display:flex; align-items:center; gap:.5rem; position:sticky; top:0; z-index:2;
+  margin:0 -.8rem; padding:.55rem 1.3rem;
+  font-size:.58rem; text-transform:uppercase; letter-spacing:.14em;
+  color:rgba(148,163,184,.6); background:#07071a;
+  border-bottom:1px solid rgba(255,255,255,.05);
+}
+.lgh .ld{ width:8px; height:8px; border-radius:50% }
+.lgc{ margin-left:auto; color:rgba(148,163,184,.35) }
+.lrow{
+  display:flex; align-items:center; gap:.6rem; padding:.4rem .55rem;
+  border-radius:9px; cursor:pointer; transition:background .12s;
+}
+.lrow:hover, .lrow.active{ background:rgba(235,94,40,.14) }
+.lrow.active{ box-shadow:inset 2px 0 0 #eb5e28 }
+.lrd{ width:7px; height:7px; border-radius:50%; flex-shrink:0 }
+.lrt{ font-size:.78rem; color:rgba(203,213,225,.78); line-height:1.35;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.lrow.active .lrt{ color:#fff }
+
+/* ── Floating labels ── */
+#labels{ position:fixed; inset:0; z-index:30; pointer-events:none }
+.flabel{
+  position:absolute; transform:translate(-50%,-150%); white-space:nowrap;
+  padding:.14rem .5rem; border-radius:7px; pointer-events:none;
+  background:rgba(4,4,22,.72); backdrop-filter:blur(6px);
+}
+.flabel.focus{
+  display:flex; flex-direction:column; gap:.15rem; max-width:240px; white-space:normal;
+  padding:.5rem .7rem; border-radius:10px; z-index:2; transform:translate(-50%,-160%);
+  background:rgba(4,4,22,.9); border:1px solid rgba(235,94,40,.4);
+  box-shadow:0 0 24px rgba(235,94,40,.14);
+}
+.fl-layer{ font-size:.56rem; font-weight:700; text-transform:uppercase; letter-spacing:.12em }
+.fl-text{ font-size:.8rem; color:#fff; line-height:1.3 }
+.flabel.nbr{ color:rgba(203,213,225,.72); font-size:.72rem; text-shadow:0 1px 4px #000 }
+
+/* toggle button + sidebar collapse */
+#ptoggle{
+  position:fixed; top:1.3rem; right:1.2rem; z-index:60;
+  width:38px; height:38px; border-radius:11px; line-height:1;
+  background:rgba(4,4,20,.7); backdrop-filter:blur(20px);
+  border:1px solid rgba(255,255,255,.1); color:rgba(235,94,40,.9);
+  font-size:1rem; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:background .15s, border-color .15s;
+}
+#ptoggle:hover{ background:rgba(235,94,40,.14); border-color:rgba(235,94,40,.45) }
+#panel{ transition:transform .35s cubic-bezier(.4,0,.2,1) }
+body.panel-collapsed #panel{ transform:translateX(100%) }
+body.panel-collapsed #topbar{ right:0 }
+body.panel-collapsed #hint{ right:2rem }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="ld-logo">Initializing Neural Map</div>
+  <div class="ld-bar"><div class="ld-fill"></div></div>
+</div>
+
+<canvas id="c"></canvas>
+
+<div id="ui">
+  <div id="topbar">
+    <div class="brand">
+      <div class="pulse-dot"></div>
+      <div>
+        <div class="brand-name">Cerebrumma</div>
+        <div class="stats"><b id="nc">0</b> memories &nbsp;·&nbsp; <b id="ec">0</b> connections &nbsp;·&nbsp; <b id="lc">5</b> layers</div>
+      </div>
+    </div>
+  </div>
+  <div id="legend">
+    <div class="lt">Memory Layers</div>
+  </div>
+  <div id="hint">
+    drag a <kbd>node</kbd> to move &nbsp; drag <kbd>space</kbd> to orbit<br>
+    scroll to <kbd>zoom</kbd> &nbsp; hover to <kbd>inspect</kbd>
+  </div>
+</div>
+
+<button id="ptoggle" title="Toggle memory list" aria-label="Toggle memory list">☰</button>
+
+<div id="panel">
+  <div id="phead">
+    <input id="search" type="text" placeholder="Search memories…" autocomplete="off" />
+  </div>
+  <div id="list"></div>
+</div>
+<div id="labels"></div>
+
+<script type="application/json" id="graph-data">{{graph_data}}</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls }    from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer }   from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass }       from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass }  from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass }       from 'three/addons/postprocessing/OutputPass.js';
+
+// ── Layer config ─────────────────────────────────────────────────────────────
+const LAYERS = {
+  Episodic:   { hex:'#00d4ff', c: new THREE.Color(0x00d4ff) },
+  Semantic:   { hex:'#9966ff', c: new THREE.Color(0x9966ff) },
+  Procedural: { hex:'#00ff99', c: new THREE.Color(0x00ff99) },
+  Personal:   { hex:'#ff3399', c: new THREE.Color(0xff3399) },
+  Reflection: { hex:'#ffaa00', c: new THREE.Color(0xffaa00) },
+  Other:      { hex:'#94a3b8', c: new THREE.Color(0x94a3b8) },
+};
+const LAYER_ORDER = ['Episodic','Semantic','Procedural','Personal','Reflection','Other'];
+
+// ── Demo memory data (fallback when the brain is empty) ──────────────────────
+const RAW_DEMO = [
+  ['Episodic','Shipped v0.1 of cerebrumma CLI to GitHub'],
+  ['Episodic','Debugged fastembed model download hang on first run'],
+  ['Episodic','Integrated sqlite-vec for vector similarity search'],
+  ['Episodic','First successful cerebrum search returning ranked results'],
+  ['Episodic','Rewrote daemon to use tokio async runtime'],
+  ['Episodic','App Store rejection #1 — privacy manifest missing'],
+  ['Episodic','App Store rejection #2 — entitlements mismatch'],
+  ['Episodic','Resolved paywall layout spacing for Popcorn Reader'],
+  ['Episodic','Onboarded first beta tester via TestFlight'],
+  ['Episodic','Discovered memory layer classification bug in path parser'],
+  ['Episodic','Fixed player UI layout regression after SwiftUI update'],
+  ['Episodic','Merged cerebrum map --graph feature branch'],
+  ['Episodic','First successful neural map render with 4 nodes'],
+  ['Episodic','Debugged TDZ crash in brain_graph.html JS'],
+  ['Episodic','Set up Firebase project for mobile backend'],
+  ['Episodic','Configured GA4 analytics for iOS app'],
+  ['Episodic','Migrated from manual embeddings to fastembed BGE model'],
+  ['Episodic','Wrote install.sh bootstrap script'],
+  ['Episodic','Added git hook auto-capture for commit context'],
+  ['Episodic','Ran first cerebrum audit on cerebrumma codebase'],
+  ['Episodic','Rebuilt Cargo workspace after dependency conflict'],
+  ['Episodic','Hit 1.6MB embeddings.db with only 4 entries — schema bloat'],
+  ['Episodic','Implemented YAML frontmatter in all memory files'],
+  ['Episodic','Set up MCP server for IDE integration'],
+  ['Episodic','Deployed first dream/reflection cycle successfully'],
+  ['Episodic','Tested cerebrum why query on glassmorphism insight'],
+  ['Episodic','Confirmed cosine similarity threshold at 0.55'],
+  ['Episodic','Wrote ROADMAP.md with 5-phase vision'],
+  ['Episodic','Opened cerebrumma to equitable-by-design principles'],
+  ['Episodic','Resolved SwiftUI subscription paywall button spacing'],
+  ['Semantic','Cerebrumma bridges AI and developer workflow via persistent memory'],
+  ['Semantic','Vector threshold 0.55 balances recall vs precision for personal brains'],
+  ['Semantic','BGE-small-EN-v1.5 best perf/quality tradeoff for 384-dim embeddings'],
+  ['Semantic','sqlite-vec stores float[384] as raw little-endian f32 blobs'],
+  ['Semantic','Glassmorphism + deep purple gradients define the Cerebrumma aesthetic'],
+  ['Semantic','Force graphs need interaction state hoisted before animation loop'],
+  ['Semantic','App Store rejections come in pairs — fix one and find another'],
+  ['Semantic','Firebase privacy manifest required for SDK >= 10.x'],
+  ['Semantic','TDZ crashes happen when let variables are accessed before declaration'],
+  ['Semantic','Memory layers map to cognitive science: episodic, semantic, procedural'],
+  ['Semantic','Outfit 800 weight -0.03em tracking creates premium feel'],
+  ['Semantic','DAMPING=0.88 GRAVITY=0.01 keeps graph alive without diverging'],
+  ['Semantic','Edge opacity min 0.18 is visibility floor for dark-mode canvas graphs'],
+  ['Semantic','Auto-fit view after settle lets physics compute accurate bounding box'],
+  ['Semantic','cerebrum map --graph is the most compelling demo for new users'],
+  ['Semantic','Session briefs reduce AI onboarding cost by 60-80 percent'],
+  ['Semantic','Reflection cycles distill episodic logs into semantic insights'],
+  ['Semantic','The pitch vs Obsidian: zero manual links, all inferred from meaning'],
+  ['Semantic','MCP integration lets any IDE read the brain without CLI dependency'],
+  ['Semantic','Rust fastembed blocks the thread — needs spawn_blocking in async'],
+  ['Semantic','Local LLM fallback is the privacy escape hatch for enterprise users'],
+  ['Semantic','cerebrum search is most useful when brain has 50+ diverse entries'],
+  ['Semantic','GA4 custom events should mirror the memory layer taxonomy'],
+  ['Semantic','Top-3 neighbors per node keeps graph readable without losing connectivity'],
+  ['Semantic','Hub nodes emerge naturally around foundational concepts at 5+ edges'],
+  ['Semantic','Fixed home positions prevent physics chaos in cluster-based graphs'],
+  ['Semantic','The brain map is the screenshottable moment for landing page credibility'],
+  ['Semantic','daemon.log rotation prevents unbounded disk growth in long-lived sessions'],
+  ['Semantic','Three.js InstancedMesh with MeshBasicMaterial gives bloom-ready glow'],
+  ['Semantic','UnrealBloomPass threshold 0.1 makes node colors bloom without wash'],
+  ['Procedural','All CLI output: magenta for actions, green for success, yellow for hints'],
+  ['Procedural','New CLI commands must follow the Cerebrumma Aesthetic in ui.rs'],
+  ['Procedural','cerebrum init must create both embeddings.db and memory/ subdirs'],
+  ['Procedural','Every memory file gets YAML frontmatter: date, layer, source, tags'],
+  ['Procedural','Use cargo build --release for benchmarks, never debug builds'],
+  ['Procedural','Templates in templates/ embedded via include_str! at compile time'],
+  ['Procedural','brain_graph.html is always regenerated — never edit .cerebrum/ output'],
+  ['Procedural','Git hooks capture context automatically; never require manual add'],
+  ['Procedural','Rust binary must stay under 10MB stripped for install.sh viability'],
+  ['Procedural','All async embedding calls go through tokio::spawn_blocking'],
+  ['Procedural','Error messages always suggest the corrective command in yellow'],
+  ['Procedural','cerebrum search returns top-5 by default, configurable via --k flag'],
+  ['Procedural','Vector DB is append-only; deduplication at query time by path hash'],
+  ['Procedural','Session briefs written to dream/Session-Brief.md, never overwritten'],
+  ['Procedural','Audit prompt includes directory structure + top-50 files content'],
+  ['Procedural','Firebase SDK must include NSPrivacyAccessedAPITypes in manifest'],
+  ['Procedural','SwiftUI views use ViewModifiers not inline modifiers for consistency'],
+  ['Procedural','Analytics events fire on memory write, search, and map generation'],
+  ['Procedural','Use npx -y firebase-tools@latest for all Firebase CLI operations'],
+  ['Procedural','MCP server exposes read-only tools only — writes go through CLI'],
+  ['Personal','We use glassmorphism and deep purple gradients for a premium feel'],
+  ['Personal','Cerebrumma is built for developers who think in systems not just code'],
+  ['Personal','Equitable AI tools must work for non-English speakers and non-experts'],
+  ['Personal','The UI uses accessible contrast ratios and high-readability typography'],
+  ['Personal','Open source core, premium cloud sync — the sustainability model'],
+  ['Personal','Bias toward action: ship rough, iterate fast, document learnings'],
+  ['Personal','Every feature explainable in one sentence to a non-engineer'],
+  ['Personal','The brain belongs to the user — no telemetry without explicit opt-in'],
+  ['Personal','Design for the developer who works alone at midnight with no context'],
+  ['Personal','Cerebrumma should feel like a superpower, not a chore'],
+  ['Personal','Latency matters more than accuracy for daily-use developer tools'],
+  ['Personal','Brain portability is non-negotiable — must survive a hard drive wipe'],
+  ['Personal','Monochrome + one accent color is the brand constraint for all UIs'],
+  ['Personal','We complement Obsidian for AI-native workflows, not compete with it'],
+  ['Personal','Popcorn Reader and cerebrumma share a common design language'],
+  ['Personal','Fair hiring principles apply to contributor onboarding too'],
+  ['Personal','Documentation is a first-class feature, not an afterthought'],
+  ['Personal','The best memory is one the user never had to create manually'],
+  ['Personal','Failure modes should be loud and helpful, not silent and mysterious'],
+  ['Personal','Ship the screenshottable AI brain moment before v1.0'],
+  ['Reflection','Audit: Largest risk is embedding latency blocking CLI UX'],
+  ['Reflection','Audit: Memory deduplication not implemented — DB will bloat over time'],
+  ['Reflection','Audit: No test suite — 100% manual verification is unsustainable'],
+  ['Reflection','Audit: Graph rendering breaks with >500 nodes due to O(n^2) repulsion'],
+  ['Reflection','Audit: install.sh has no rollback on partial failure'],
+  ['Reflection','Reflection: cerebrum audit most valuable when run weekly not ad-hoc'],
+  ['Reflection','Reflection: dream cycle not yet tested with real AI response'],
+  ['Reflection','Reflection: MCP server is the highest-leverage integration surface'],
+  ['Reflection','Reflection: demo data more compelling than real data for early users'],
+  ['Reflection','Reflection: graph viz is the product most shareable artifact'],
+  ['Reflection','Prune: 3 duplicate episodic entries about App Store rejections'],
+  ['Reflection','Prune: audit prompts older than 30 days should be archived'],
+  ['Reflection','Insight: vector search relevance drops below 0.55 — hard cutoff correct'],
+  ['Reflection','Insight: session briefs reduce AI onboarding time significantly'],
+  ['Reflection','Insight: --graph flag is 10x more engaging than the table map'],
+  ['Reflection','Next: implement cerebrum sync for cloud backup'],
+  ['Reflection','Next: add cerebrum forget to remove stale memories'],
+  ['Reflection','Next: WebSocket live updates so graph auto-refreshes on new memories'],
+  ['Reflection','Next: cluster coloring by semantic group not just layer'],
+  ['Reflection','Next: export graph as SVG for landing page embed'],
+  ['Reflection','Next: cerebrum share — public read-only brain snapshot'],
+  ['Reflection','Next: smart pruning — auto-merge near-duplicate memories'],
+  ['Reflection','Next: timeline view — plot memories on a time axis'],
+  ['Reflection','Next: cerebrum ask — RAG-style Q&A over the full brain'],
+  ['Reflection','Next: mobile companion app for capturing memories on the go'],
+  ['Reflection','Next: per-project brain isolation with global fallback'],
+  ['Reflection','Next: browser extension to capture research context'],
+  ['Reflection','Next: Slack/Discord bot integration for team brains'],
+  ['Reflection','Next: diff view showing what changed between reflection cycles'],
+  ['Reflection','Next: 3D neural map with Three.js WebGL visualization'],
+  ['Reflection','Next: voice input integration for hands-free memory capture'],
+  ['Reflection','Next: import/export Obsidian vault as cerebrumma brain'],
+  ['Reflection','Next: semantic clustering auto-discovery via HDBSCAN'],
+];
+
+// Real memory data injected by `cerebrum map`; falls back to the bundled demo
+let GRAPH = {};
+try { GRAPH = JSON.parse(document.getElementById('graph-data').textContent); } catch (_) {}
+const USE_REAL = !!(GRAPH && GRAPH.nodes && GRAPH.nodes.length);
+const RAW = USE_REAL
+  ? GRAPH.nodes.map(n => [ LAYERS[n.layer] ? n.layer : 'Other', n.label ])
+  : RAW_DEMO;
+
+// ── Build node objects ───────────────────────────────────────────────────────
+const nodes = RAW.map((r,i) => ({
+  id: i, label: r[1], layer: r[0],
+  color: LAYERS[r[0]].c.clone(),
+  position: new THREE.Vector3(),
+  salience: .5 + Math.random() * .5,
+  deg: 0,
+}));
+
+// ── Deterministic RNG ────────────────────────────────────────────────────────
+function mkRng(seed) {
+  let s = seed;
+  return () => {
+    s = Math.imul(s ^ s >>> 15, s | 1);
+    s ^= s + Math.imul(s ^ s >>> 7, s | 61);
+    return ((s ^ s >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rng = mkRng(0xDEADC0DE);
+
+// ── Group by layer ───────────────────────────────────────────────────────────
+const byLayer = {};
+nodes.forEach((n,i) => { (byLayer[n.layer] = byLayer[n.layer]||[]).push(i); });
+
+// ── 3D cluster positions ─────────────────────────────────────────────────────
+// Episodic at top, 4 others around ring below
+const PETAL_R = 215;
+const clusterCenter = {};
+LAYER_ORDER.forEach((layer, i) => {
+  if (i === 0) {
+    clusterCenter[layer] = new THREE.Vector3(0, 255, 0);
+  } else {
+    const a = ((i-1)/Math.max(1, LAYER_ORDER.length-1)) * Math.PI * 2 - Math.PI / 2;
+    clusterCenter[layer] = new THREE.Vector3(
+      Math.cos(a) * PETAL_R, 15, Math.sin(a) * PETAL_R
+    );
+  }
+});
+
+// Within-cluster: Fibonacci sphere surface + random radius
+const lIdx = {};
+nodes.forEach(n => {
+  lIdx[n.layer] = lIdx[n.layer] || 0;
+  const i   = lIdx[n.layer]++;
+  const tot = byLayer[n.layer].length;
+  const phi   = Math.acos(1 - 2*(i+.5)/tot);
+  const theta = Math.PI * (1+Math.sqrt(5)) * i;
+  const r     = 42 + rng() * 38;
+  const cc    = clusterCenter[n.layer];
+  n.position.set(
+    cc.x + r * Math.sin(phi) * Math.cos(theta),
+    cc.y + r * Math.cos(phi),
+    cc.z + r * Math.sin(phi) * Math.sin(theta)
+  );
+});
+
+// ── Build edges ──────────────────────────────────────────────────────────────
+const edges = [];
+const edgeSeen = new Set();
+const adj = nodes.map(() => []); // adjacency: [{node, edge}]
+
+function addEdge(a, b, w) {
+  if (a === b) return;
+  const k = a < b ? `${a}|${b}` : `${b}|${a}`;
+  if (edgeSeen.has(k)) return;
+  edgeSeen.add(k);
+  const idx = edges.length;
+  edges.push({ s:a, t:b, w });
+  nodes[a].deg++; nodes[b].deg++;
+  adj[a].push({ node:b, edge:idx });
+  adj[b].push({ node:a, edge:idx });
+}
+
+if (USE_REAL) {
+  // Real edges: inferred from embedding similarity by `cerebrum map`
+  GRAPH.edges.forEach(e => addEdge(e.source, e.target, e.weight));
+} else {
+  Object.values(byLayer).forEach(ids => {
+    for (let i = 0; i < ids.length; i++) {
+      const peers = 2 + Math.floor(rng()*3);
+      for (let k = 0; k < peers; k++)
+        addEdge(ids[i], ids[Math.floor(rng()*ids.length)], .6+rng()*.35);
+    }
+  });
+  [['Semantic','Episodic',42],['Semantic','Procedural',30],
+   ['Semantic','Personal',26],['Semantic','Reflection',36],
+   ['Episodic','Procedural',20],['Episodic','Reflection',24],
+   ['Personal','Reflection',18],['Procedural','Reflection',15],
+   ['Episodic','Personal',12],['Procedural','Personal',10],
+  ].forEach(([la,lb,n]) => {
+    const aa=byLayer[la]||[], bb=byLayer[lb]||[];
+    for (let k=0;k<n;k++) addEdge(aa[Math.floor(rng()*aa.length)], bb[Math.floor(rng()*bb.length)], .55+rng()*.4);
+  });
+}
+
+// ── Stats ────────────────────────────────────────────────────────────────────
+document.getElementById('nc').textContent = nodes.length;
+document.getElementById('ec').textContent = edges.length;
+
+const legEl = document.getElementById('legend');
+LAYER_ORDER.forEach(layer => {
+  if (!byLayer[layer] || !byLayer[layer].length) return; // skip empty layers
+  const c = LAYERS[layer].hex;
+  const row = document.createElement('div'); row.className='lr';
+  row.innerHTML = `<span class="ld" style="background:${c};box-shadow:0 0 8px ${c}88"></span>${layer}`;
+  legEl.appendChild(row);
+});
+document.getElementById('lc').textContent = LAYER_ORDER.filter(l => byLayer[l] && byLayer[l].length).length;
+
+// ── List panel · search · sync · floating labels ─────────────────────────────
+let hoverLock  = false;   // true while the list drives the hover
+let labelState = [];      // [{id, el}] floating labels to reposition each frame
+let focusTarget = null;   // orbit re-center target after a list click
+const NBR_LABEL_CAP = 12; // don't flood hub nodes with labels
+
+const labelsEl = document.getElementById('labels');
+const listEl   = document.getElementById('list');
+const searchEl = document.getElementById('search');
+const panelEl  = document.getElementById('panel');
+const rowEls   = new Array(nodes.length);
+
+// Build the grouped list
+LAYER_ORDER.forEach(layer => {
+  const ids = byLayer[layer] || [];
+  if (!ids.length) return;
+  const grp = document.createElement('div'); grp.className = 'lgroup';
+  const hd  = document.createElement('div'); hd.className = 'lgh';
+  hd.innerHTML = `<span class="ld" style="background:${LAYERS[layer].hex}"></span>${layer}<span class="lgc">${ids.length}</span>`;
+  grp.appendChild(hd);
+  ids.forEach(idx => {
+    const row = document.createElement('div'); row.className = 'lrow';
+    row.innerHTML = `<span class="lrd" style="background:${LAYERS[layer].hex}"></span><span class="lrt"></span>`;
+    row.querySelector('.lrt').textContent = nodes[idx].label;
+    row.addEventListener('mouseenter', () => setHover(idx));
+    row.addEventListener('click',      () => focusNode(idx));
+    rowEls[idx] = row;
+    grp.appendChild(row);
+  });
+  listEl.appendChild(grp);
+});
+
+// Lock graph hover to the list while the pointer is inside the panel
+panelEl.addEventListener('mouseenter', () => hoverLock = true);
+panelEl.addEventListener('mouseleave', () => hoverLock = false);
+
+// Collapse / expand the sidebar
+document.getElementById('ptoggle').addEventListener('click', () => {
+  document.body.classList.toggle('panel-collapsed');
+});
+
+// Row visibility: while hovering a graph node → show only it + its connections;
+// otherwise → whatever matches the search box.
+function applyListFilter() {
+  const q = searchEl.value.trim().toLowerCase();
+  const filtering = hovId !== -1 && !hoverLock; // graph-driven hover only
+  let keep = null;
+  if (filtering) {
+    keep = new Set([hovId]);
+    adj[hovId].forEach(({ node: nb }) => keep.add(nb));
+  }
+  nodes.forEach((n, idx) => {
+    const row = rowEls[idx];
+    if (!row) return;
+    const show = filtering ? keep.has(idx) : (!q || n.label.toLowerCase().includes(q));
+    row.style.display = show ? '' : 'none';
+  });
+  document.querySelectorAll('.lgroup').forEach(g => {
+    const rows = [...g.querySelectorAll('.lrow')];
+    const vis  = rows.filter(r => r.style.display !== 'none').length;
+    const c = g.querySelector('.lgc');
+    if (c) c.textContent = vis;
+    g.style.display = vis ? '' : 'none';
+  });
+}
+searchEl.addEventListener('input', applyListFilter);
+
+// Click a row → highlight + gently recenter the orbit on that node
+function focusNode(idx) {
+  hoverLock = true;
+  setHover(idx);
+  focusTarget = nodes[idx].position.clone();
+}
+
+// Whenever hover changes: sync the list row + rebuild floating labels
+function syncAuxUI(id) {
+  rowEls.forEach(r => r && r.classList.remove('active'));
+  if (id !== -1 && rowEls[id]) rowEls[id].classList.add('active');
+  applyListFilter();
+  if (id !== -1 && rowEls[id]) rowEls[id].scrollIntoView({ block: 'nearest' });
+  labelsEl.textContent = '';
+  labelState = [];
+  if (id === -1) return;
+
+  // Neighbor labels (plain text)
+  adj[id].slice(0, NBR_LABEL_CAP).forEach(({ node: nb }) => {
+    const el = document.createElement('div');
+    el.className = 'flabel nbr';
+    el.textContent = nodes[nb].label;
+    labelsEl.appendChild(el);
+    labelState.push({ id: nb, el });
+  });
+
+  // Focus card last, so it renders on top
+  const n = nodes[id];
+  const card = document.createElement('div');
+  card.className = 'flabel focus';
+  card.innerHTML = `<span class="fl-layer" style="color:${LAYERS[n.layer].hex}">${n.layer} · ${n.deg} connections</span><span class="fl-text"></span>`;
+  card.querySelector('.fl-text').textContent = n.label;
+  labelsEl.appendChild(card);
+  labelState.push({ id, el: card });
+}
+
+// Project the floating labels to screen space each frame
+const _pv = new THREE.Vector3();
+function positionLabels() {
+  for (const { id, el } of labelState) {
+    _pv.copy(nodes[id].position).project(camera);
+    if (_pv.z > 1) { el.style.display = 'none'; continue; }
+    el.style.display = '';
+    el.style.left = ((_pv.x * 0.5 + 0.5) * W()) + 'px';
+    el.style.top  = ((-_pv.y * 0.5 + 0.5) * H()) + 'px';
+  }
+}
+
+// ── Three.js core ────────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const W = () => window.innerWidth, H = () => window.innerHeight;
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(W(), H());
+renderer.toneMapping = THREE.ReinhardToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+scene.fog = new THREE.FogExp2(0x000000, 0.00025);
+
+const camera = new THREE.PerspectiveCamera(58, W()/H(), 0.5, 3000);
+camera.position.set(0, 150, 640);
+camera.lookAt(0, 60, 0);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.045;
+controls.minDistance = 60;
+controls.maxDistance = 1400;
+controls.target.set(0, 60, 0);
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.18;
+
+// ── Post-processing ──────────────────────────────────────────────────────────
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+// strength ↓, radius ↓, threshold ↑ → tight glow, crisp dot centers (no haze)
+const bloom = new UnrealBloomPass(new THREE.Vector2(W(), H()), 0.45, 0.18, 0.25);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+// ── Lighting ─────────────────────────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0x0a0a2a, 8));
+LAYER_ORDER.forEach(layer => {
+  const pl = new THREE.PointLight(LAYERS[layer].c, 25, 220);
+  pl.position.copy(clusterCenter[layer]);
+  scene.add(pl);
+});
+
+// ── Background: solid black (nebula starfield removed) ────────────────────────
+
+// ── Floor grid removed ────────────────────────────────────────────────────────
+
+// ── Center orb removed (core sphere, atmosphere, orbital ring & spokes) ───────
+
+// ── Node points cloud (sprite dots, colored by memory layer) ──────────────────
+const N_NODES  = nodes.length;
+const nPos     = new Float32Array(N_NODES*3);
+const nCol     = new Float32Array(N_NODES*3);
+const nSize    = new Float32Array(N_NODES);  // live size (hover-animated)
+const nBright  = new Float32Array(N_NODES);  // brightness multiplier
+const baseSize = new Float32Array(N_NODES);  // resting size
+
+nodes.forEach((n,i) => {
+  nPos[i*3]=n.position.x; nPos[i*3+1]=n.position.y; nPos[i*3+2]=n.position.z;
+  nCol[i*3]=n.color.r;    nCol[i*3+1]=n.color.g;    nCol[i*3+2]=n.color.b;
+  baseSize[i] = 15 + Math.min(n.deg,10) * 1.8;
+  nSize[i]    = baseSize[i];
+  nBright[i]  = 1.0;
+});
+
+// Physics state: home anchors + velocities for draggable, springy layout
+const hPos = nPos.slice();
+const vel  = new Float32Array(N_NODES*3);
+
+const nodeGeo = new THREE.BufferGeometry();
+nodeGeo.setAttribute('position', new THREE.BufferAttribute(nPos,3));
+nodeGeo.setAttribute('aColor',   new THREE.BufferAttribute(nCol,3));
+const sizeAttr   = new THREE.BufferAttribute(nSize,1);   sizeAttr.setUsage(THREE.DynamicDrawUsage);
+const brightAttr = new THREE.BufferAttribute(nBright,1); brightAttr.setUsage(THREE.DynamicDrawUsage);
+nodeGeo.setAttribute('aSize',   sizeAttr);
+nodeGeo.setAttribute('aBright', brightAttr);
+
+const nodeMat = new THREE.ShaderMaterial({
+  uniforms: { uDpr: { value: renderer.getPixelRatio() } },
+  vertexShader:`
+    uniform float uDpr;
+    attribute vec3  aColor;
+    attribute float aSize;
+    attribute float aBright;
+    varying vec3 vCol; varying float vBright;
+    void main(){
+      vCol = aColor; vBright = aBright;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      gl_PointSize = min(aSize * uDpr * (340.0 / -mv.z), 90.0);
+      gl_Position  = projectionMatrix * mv;
+    }
+  `,
+  fragmentShader:`
+    varying vec3 vCol; varying float vBright;
+    void main(){
+      float d = length(gl_PointCoord - vec2(0.5));
+      if (d > 0.5) discard;                       // circular sprite
+      float core = smoothstep(0.5, 0.12, d);      // soft edge
+      gl_FragColor = vec4(vCol * vBright, core);
+    }
+  `,
+  transparent:true, depthWrite:false, blending:THREE.NormalBlending,
+});
+const nodePoints = new THREE.Points(nodeGeo, nodeMat);
+scene.add(nodePoints);
+
+// ── Connection LineSegments with flow shader ───────────────────────────────────
+const E = edges.length;
+const lPos  = new Float32Array(E*6);
+const lProg = new Float32Array(E*2);
+const lPhase= new Float32Array(E*2);
+const lColA = new Float32Array(E*6); // source color
+const lColB = new Float32Array(E*6); // target color (for gradient)
+const lHL   = new Float32Array(E*2); // highlight flag
+
+edges.forEach((e,i) => {
+  const a=nodes[e.s].position, b=nodes[e.t].position;
+  e.rest = a.distanceTo(b); // spring rest length = initial layout distance
+  lPos[i*6+0]=a.x;lPos[i*6+1]=a.y;lPos[i*6+2]=a.z;
+  lPos[i*6+3]=b.x;lPos[i*6+4]=b.y;lPos[i*6+5]=b.z;
+  lProg[i*2]=0.0; lProg[i*2+1]=1.0;
+  const ph=rng(); lPhase[i*2]=ph; lPhase[i*2+1]=ph;
+  const ca=nodes[e.s].color, cb=nodes[e.t].color;
+  lColA[i*6+0]=ca.r;lColA[i*6+1]=ca.g;lColA[i*6+2]=ca.b;
+  lColA[i*6+3]=ca.r;lColA[i*6+4]=ca.g;lColA[i*6+5]=ca.b;
+  lColB[i*6+0]=cb.r;lColB[i*6+1]=cb.g;lColB[i*6+2]=cb.b;
+  lColB[i*6+3]=cb.r;lColB[i*6+4]=cb.g;lColB[i*6+5]=cb.b;
+  lHL[i*2]=0; lHL[i*2+1]=0;
+});
+
+const lineGeo = new THREE.BufferGeometry();
+lineGeo.setAttribute('position', new THREE.BufferAttribute(lPos,3));
+lineGeo.setAttribute('aProgress',new THREE.BufferAttribute(lProg,1));
+lineGeo.setAttribute('aPhase',   new THREE.BufferAttribute(lPhase,1));
+lineGeo.setAttribute('aColA',    new THREE.BufferAttribute(lColA,3));
+lineGeo.setAttribute('aColB',    new THREE.BufferAttribute(lColB,3));
+const hlAttr = new THREE.BufferAttribute(lHL,1);
+hlAttr.setUsage(THREE.DynamicDrawUsage);
+lineGeo.setAttribute('aHL', hlAttr);
+
+const lineUniforms = { uTime:{ value:0 } };
+const lineSeg = new THREE.LineSegments(lineGeo, new THREE.ShaderMaterial({
+  uniforms: lineUniforms,
+  vertexShader:`
+    attribute float aProgress;
+    attribute float aPhase;
+    attribute vec3  aColA;
+    attribute vec3  aColB;
+    attribute float aHL;
+    varying float vP; varying float vPh; varying vec3 vCA; varying vec3 vCB; varying float vHL;
+    void main(){
+      vP=aProgress; vPh=aPhase; vCA=aColA; vCB=aColB; vHL=aHL;
+      gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);
+    }
+  `,
+  fragmentShader:`
+    uniform float uTime;
+    varying float vP; varying float vPh; varying vec3 vCA; varying vec3 vCB; varying float vHL;
+    void main(){
+      // Color gradient along edge
+      vec3 col = mix(vCA, vCB, vP);
+      // Flow pulse
+      float flow = fract(vP*2.8 - uTime*.42 + vPh);
+      float pulse= smoothstep(0.,.11,flow)*smoothstep(.28,.11,flow);
+      float base = .012 + vHL*.34;
+      float alpha= base + pulse*(.10 + vHL*.80);
+      vec3 bright= col + pulse*(.35 + vHL*.7) + vHL*.25;
+      gl_FragColor = vec4(bright, alpha);
+    }
+  `,
+  transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
+}));
+scene.add(lineSeg);
+
+// ── Hover ──────────────────────────────────────────────────────────────────────
+const raycaster = new THREE.Raycaster();
+raycaster.params.Points.threshold = 9; // world-space picking radius for dots
+const pointer   = new THREE.Vector2(-9,-9);
+let hovId = -1;
+const neighborSet = new Set();
+
+// Recompute every dot's size + brightness from the current hover (focus-dim)
+function applyNodeState() {
+  for (let i = 0; i < N_NODES; i++) {
+    let b, s;
+    if (hovId === -1)            { b = 1.00; s = baseSize[i]; }
+    else if (i === hovId)        { b = 1.70; s = baseSize[i] * 2.1; }
+    else if (neighborSet.has(i)) { b = 1.15; s = baseSize[i] * 1.25; }
+    else                         { b = 0.16; s = baseSize[i] * 0.8; }
+    nBright[i] = b; nSize[i] = s;
+  }
+  brightAttr.needsUpdate = true;
+  sizeAttr.needsUpdate   = true;
+}
+
+function setHover(id) {
+  if (id === hovId) return;
+
+  // Clear previous edge highlights
+  if (hovId !== -1) adj[hovId].forEach(({edge:ei}) => { lHL[ei*2]=0; lHL[ei*2+1]=0; });
+
+  hovId = id;
+  neighborSet.clear();
+
+  if (id !== -1) {
+    adj[id].forEach(({node:nb, edge:ei}) => {
+      neighborSet.add(nb);
+      lHL[ei*2]=1; lHL[ei*2+1]=1;
+    });
+    controls.autoRotate = false;
+    canvas.style.cursor = 'pointer';
+  } else {
+    canvas.style.cursor = 'grab';
+  }
+
+  hlAttr.needsUpdate = true;
+  applyNodeState();
+  syncAuxUI(id);
+}
+
+canvas.addEventListener('pointermove', ev => {
+  hoverLock = false; // pointer is back on the canvas — resume raycast hover
+  pointer.set(
+    (ev.clientX/W())*2-1,
+    -(ev.clientY/H())*2+1
+  );
+  if (dragId !== -1) {
+    raycaster.setFromCamera(pointer, camera);
+    if (raycaster.ray.intersectPlane(dragPlane, dragPoint)) {
+      nodes[dragId].position.copy(dragPoint);
+      vel[dragId*3] = vel[dragId*3+1] = vel[dragId*3+2] = 0;
+    }
+  }
+});
+canvas.addEventListener('pointerleave', () => setHover(-1));
+
+// ── Draggable nodes (live spring physics) ────────────────────────────────────
+let dragId = -1;
+const dragPlane = new THREE.Plane();
+const dragPoint = new THREE.Vector3();
+const _camDir   = new THREE.Vector3();
+const K_HOME = 0.010, K_EDGE = 0.025, DAMP = 0.82;
+
+canvas.addEventListener('pointerdown', ev => {
+  pointer.set((ev.clientX/W())*2-1, -(ev.clientY/H())*2+1);
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObject(nodePoints);
+  if (hits.length) {
+    dragId = hits[0].index;
+    controls.enabled = false; // don't orbit while dragging a node
+    camera.getWorldDirection(_camDir);
+    dragPlane.setFromNormalAndCoplanarPoint(_camDir, nodes[dragId].position);
+    canvas.style.cursor = 'grabbing';
+  }
+});
+window.addEventListener('pointerup', () => {
+  if (dragId !== -1) { dragId = -1; controls.enabled = true; canvas.style.cursor = 'grab'; }
+});
+
+// One spring step: drag pulls neighbors along edges; home anchors ease it back
+function physics() {
+  for (const e of edges) {
+    const a = nodes[e.s].position, b = nodes[e.t].position;
+    let dx=b.x-a.x, dy=b.y-a.y, dz=b.z-a.z;
+    const d = Math.hypot(dx,dy,dz) || 0.001;
+    const f = (d - e.rest) * K_EDGE / d;
+    dx*=f; dy*=f; dz*=f;
+    if (e.s !== dragId) { vel[e.s*3]+=dx; vel[e.s*3+1]+=dy; vel[e.s*3+2]+=dz; }
+    if (e.t !== dragId) { vel[e.t*3]-=dx; vel[e.t*3+1]-=dy; vel[e.t*3+2]-=dz; }
+  }
+  for (let i=0;i<N_NODES;i++){
+    if (i === dragId) continue;
+    const p = nodes[i].position;
+    vel[i*3]   += (hPos[i*3]  -p.x)*K_HOME;
+    vel[i*3+1] += (hPos[i*3+1]-p.y)*K_HOME;
+    vel[i*3+2] += (hPos[i*3+2]-p.z)*K_HOME;
+    vel[i*3]*=DAMP; vel[i*3+1]*=DAMP; vel[i*3+2]*=DAMP;
+    p.x+=vel[i*3]; p.y+=vel[i*3+1]; p.z+=vel[i*3+2];
+  }
+  // push updated positions into the GPU buffers
+  const pa = nodeGeo.getAttribute('position');
+  for (let i=0;i<N_NODES;i++){ pa.array[i*3]=nodes[i].position.x; pa.array[i*3+1]=nodes[i].position.y; pa.array[i*3+2]=nodes[i].position.z; }
+  pa.needsUpdate = true;
+  for (let i=0;i<edges.length;i++){
+    const a=nodes[edges[i].s].position, b=nodes[edges[i].t].position;
+    lPos[i*6]=a.x;lPos[i*6+1]=a.y;lPos[i*6+2]=a.z;
+    lPos[i*6+3]=b.x;lPos[i*6+4]=b.y;lPos[i*6+5]=b.z;
+  }
+  lineGeo.getAttribute('position').needsUpdate = true;
+}
+
+// ── Auto-rotate on idle ────────────────────────────────────────────────────────
+let idleTimer = null;
+function resetIdle(){
+  clearTimeout(idleTimer);
+  controls.autoRotate=false;
+  idleTimer=setTimeout(()=>{ if(hovId===-1) controls.autoRotate=true; },4000);
+}
+canvas.addEventListener('pointerdown', resetIdle);
+canvas.addEventListener('wheel',       resetIdle);
+
+// ── Clock & animation loop ────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+
+function tick() {
+  requestAnimationFrame(tick);
+  const t = clock.getElapsedTime();
+
+  // Update shader uniforms
+  lineUniforms.uTime.value  = t;
+
+  // Hover raycaster (skipped while the list drives the hover)
+  if (!hoverLock) {
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObject(nodePoints);
+    setHover(hits.length ? hits[0].index : -1);
+  }
+
+  // Gently recenter the orbit on a list-focused node
+  if (focusTarget) {
+    controls.target.lerp(focusTarget, 0.08);
+    if (controls.target.distanceTo(focusTarget) < 0.5) focusTarget = null;
+  }
+
+  physics();
+  positionLabels();
+
+  controls.update();
+  composer.render();
+}
+tick();
+
+// ── Resize ────────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = W()/H();
+  camera.updateProjectionMatrix();
+  renderer.setSize(W(), H());
+  composer.setSize(W(), H());
+  bloom.resolution.set(W(), H());
+});
+
+// ── Dismiss loading screen ────────────────────────────────────────────────────
+setTimeout(() => {
+  const l = document.getElementById('loading');
+  l.style.opacity='0';
+  setTimeout(()=>l.remove(), 900);
+}, 1600);
+
+</script>
+</body>
+</html>
