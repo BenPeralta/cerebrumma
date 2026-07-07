@@ -13,6 +13,8 @@ use crate::vector::store_vector;
 pub fn build_reflection_prompt(episodes: &[(PathBuf, String)]) -> String {
     let body = episodes
         .iter()
+        // Skip low-value file-save logs so they don't pollute the reflection.
+        .filter(|(path, _)| !path.to_string_lossy().contains("-watch"))
         .take(20)
         .map(|(path, text)| {
             let name = path.file_name().unwrap_or_default().to_string_lossy();

@@ -76,8 +76,9 @@ pub async fn watch_daemon() -> Result<()> {
             {
                 let mut map = debounce.lock().unwrap();
                 let now = Instant::now();
+                // Only log a given file once per 15 min, not on every keystroke-save.
                 if let Some(last) = map.get(&path) {
-                    if now.duration_since(*last) < Duration::from_secs(2) {
+                    if now.duration_since(*last) < Duration::from_secs(900) {
                         continue;
                     }
                 }
@@ -130,7 +131,12 @@ pub async fn check_dream_saturation(brain: &PathBuf) -> Result<()> {
         .filter(|e| {
             let name = e.file_name();
             let s = name.to_string_lossy();
-            s.ends_with(".md") && !s.contains("-dreamed") && !s.starts_with("000-")
+            // Low-value file-save logs (-watch) don't count toward saturation,
+            // so a coding session can't trigger (or pay for) a dream on its own.
+            s.ends_with(".md")
+                && !s.contains("-dreamed")
+                && !s.contains("-watch")
+                && !s.starts_with("000-")
         })
         .count();
 
