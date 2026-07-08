@@ -35,8 +35,18 @@ pub fn init_vector_db(brain: &PathBuf) -> Result<()> {
 }
 
 pub fn get_embedding(text: &str) -> Result<Vec<f32>> {
+    // Keep the model cache GLOBAL (~/.cerebrum/models), never in the project cwd —
+    // otherwise `.fastembed_cache/` leaks into the user's repo and their next commit.
+    let cache_dir = dirs::home_dir()
+        .unwrap_or_default()
+        .join(".cerebrum")
+        .join("models");
+    let _ = fs::create_dir_all(&cache_dir);
+
     let model = TextEmbedding::try_new(
-        InitOptions::new(EmbeddingModel::BGESmallENV15).with_show_download_progress(true),
+        InitOptions::new(EmbeddingModel::BGESmallENV15)
+            .with_show_download_progress(true)
+            .with_cache_dir(cache_dir),
     )?;
 
     let embeddings = model.embed(vec![text], None)?;
