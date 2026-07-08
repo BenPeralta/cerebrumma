@@ -25,7 +25,7 @@ jobs:
         include:
           - os: macos-14 # Apple Silicon
             target: aarch64-apple-darwin
-          - os: macos-13 # Intel Mac
+          - os: macos-14 # Intel Mac (cross-compiled on Apple Silicon — plentiful runners)
             target: x86_64-apple-darwin
           - os: ubuntu-latest # Linux x64
             target: x86_64-unknown-linux-gnu
