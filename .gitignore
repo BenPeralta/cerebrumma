@@ -8,3 +8,9 @@ mcp_server/__pycache__/
 mcp_server/src/*.egg-info/
 *.pyc
 .DS_Store
+AGENTS.md
+CLAUDE.md
+.cursor/
+.cursorrules
+.aider*
+.github/copilot-instructions.md

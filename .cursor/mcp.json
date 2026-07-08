@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "cerebrumma": {
-      "command": "uv",
-      "args": ["run", "--project", "mcp_server", "cerebrumma-mcp"],
-      "cwd": "${workspaceFolder}"
-    }
-  }
-}
