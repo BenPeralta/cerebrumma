@@ -10,7 +10,15 @@ Cerebrumma is a portable, git-tracked AI memory layer for developers. It lives i
 curl -fsSL http://get.cerebrumma.com | sh
 ```
 
-Installs the `cerebrum` CLI, MCP server, and configures Claude Code automatically. Requires macOS or Linux — Rust and uv are installed for you if missing.
+Downloads a prebuilt `cerebrum` binary for your platform (no compiler needed), installs the MCP server, and configures Claude Code automatically. Requires macOS (Apple Silicon or Intel) or Linux (x86_64).
+
+Or with [Homebrew](https://brew.sh):
+
+```sh
+brew install BenPeralta/cerebrumma/cerebrumma
+```
+
+The tap installs the CLI only; run the one-liner above to also set up the MCP server and Claude Code integration.
 
 ## Quickstart
 
@@ -34,8 +42,8 @@ cerebrum status
 # Let the Brain reflect and self-improve (calls LLM directly)
 cerebrum dream --auto
 
-# View a beautiful dashboard of your Brain
-cerebrum map
+# Visualize your Brain as an interactive 3D neural map
+cerebrum map --graph
 ```
 
 ## How It Works
