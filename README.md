@@ -2,6 +2,13 @@
 
 **One Brain. Any Tool.**
 
+<p align="center">
+  <a href="https://www.cerebrumma.com">
+    <img src="docs/neural-map.gif" alt="Cerebrumma neural map — cerebrum map --graph" width="640">
+  </a>
+</p>
+<p align="center"><em>Your whole AI memory, as a live neural map — <code>cerebrum map --graph</code></em></p>
+
 Cerebrumma is a portable, git-tracked AI memory layer for developers. It lives in `.cerebrum/` in your repo, works with Claude Code, Cursor, Antigravity and more — with built-in explainability and equity guardrails. No keys. No lock-in. Intelligence that compounds.
 
 ## Install
