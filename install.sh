@@ -10,6 +10,7 @@ REPO="https://github.com/BenPeralta/cerebrumma"
 OWNER="BenPeralta/cerebrumma"
 CLAUDE_JSON="$HOME/.claude.json"
 BIN_DIR="$HOME/.local/bin"
+STAR_MARKER="$HOME/.cerebrumma/.star-prompted"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -200,3 +201,64 @@ printf "    ${BOLD}cerebrum map --graph${NC}     ${DIM}# see your Brain as a neu
 printf "\n"
 printf "  ${DIM}Restart Claude Code to activate the MCP Brain tools.${NC}\n"
 printf "  ${DIM}Docs: $REPO${NC}\n\n"
+
+# ── Ask for a GitHub star (opt-in, asked at most once) ────────────────────────
+# Deliberately collects nothing: no ping, no ID, no phone-home. The only thing
+# that ever leaves the machine is a star the user explicitly agreed to.
+#
+# The /dev/tty read is not optional. The documented install path is
+# `curl -fsSL https://get.cerebrumma.com | sh`, which makes stdin the *script*
+# — a bare `read` would swallow the rest of this file instead of waiting for a
+# keypress. Reading the terminal directly is the only thing that works when
+# piped; the guards below are what keep non-interactive runs completely silent.
+prompt_star() {
+  [ -z "$CI" ]                   || return 0  # CI systems don't have opinions
+  [ -z "$CEREBRUMMA_NO_PROMPT" ] || return 0  # explicit opt-out
+  [ ! -f "$STAR_MARKER" ]        || return 0  # already asked once; don't nag
+
+  # Probe the terminal by actually opening it, in a subshell so a failure can't
+  # touch this shell. `[ -c /dev/tty ]` is NOT sufficient: under `curl | sh`
+  # with no controlling terminal the device node still exists, so the -c test
+  # passes and the read then dies with a bare "Device not configured" printed
+  # over the install output.
+  ( : < /dev/tty ) 2>/dev/null || return 0
+
+  # Record the attempt up front, so re-runs and upgrades stay silent whichever
+  # way this goes.
+  mkdir -p "$(dirname "$STAR_MARKER")" 2>/dev/null || return 0
+  : > "$STAR_MARKER" 2>/dev/null || return 0
+
+  printf "  ${DIM}Cerebrumma is free and open source. A star helps people find it.${NC}\n"
+  printf "  Star ${BOLD}$OWNER${NC} on GitHub? ${DIM}[y/N]${NC} "
+
+  reply=""
+  read -r reply < /dev/tty 2>/dev/null || reply=""  # Ctrl-D must not abort
+  printf "\n"
+
+  case "$reply" in
+    [yY] | [yY][eE][sS]) ;;
+    *) return 0 ;;
+  esac
+
+  # Star directly when the gh CLI is present and authenticated...
+  if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+    if gh api -X PUT "user/starred/$OWNER" >/dev/null 2>&1; then
+      ok "Starred — thank you!"
+      printf "\n"
+      return 0
+    fi
+  fi
+
+  # ...otherwise hand it off to a browser. Never star without consent, and
+  # never fail the install because a browser wouldn't open.
+  if command -v open >/dev/null 2>&1 && open "$REPO" >/dev/null 2>&1; then
+    ok "Opened $REPO — thank you!"
+  elif command -v xdg-open >/dev/null 2>&1 && xdg-open "$REPO" >/dev/null 2>&1; then
+    ok "Opened $REPO — thank you!"
+  else
+    info "Star it here: $REPO"
+  fi
+  printf "\n"
+}
+
+prompt_star || true
