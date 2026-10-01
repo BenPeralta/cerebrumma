@@ -106,10 +106,17 @@ pub fn init_brain(path: PathBuf) -> Result<()> {
         "memory/semantic",
         "memory/procedural/skills",
         "memory/procedural/protocols",
+        "memory/procedural/permissions",
+        "memory/procedural/escalations",
         "memory/personal",
+        "memory/brand/voice",
+        "memory/brand/examples",
+        "memory/objectives/company",
+        "memory/objectives/roles",
         "embeddings",
         "logs",
         "dream",
+        "runtime",
     ] {
         fs::create_dir_all(path.join(dir))?;
     }

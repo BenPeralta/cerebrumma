@@ -107,6 +107,87 @@ def get_protocols() -> str:
     return "\n\n---\n\n".join(all_protocols)
 
 
+def _runtime_snapshot() -> tuple[Path, dict]:
+    """Load the highest-priority published Business Brain snapshot."""
+    for brain in brain_paths():
+        snapshot_path = brain / "runtime" / "brain.json"
+        if snapshot_path.exists():
+            try:
+                return snapshot_path, json.loads(snapshot_path.read_text())
+            except (OSError, json.JSONDecodeError) as exc:
+                raise RuntimeError(
+                    f"Published Business Brain is unreadable: {snapshot_path}: {exc}"
+                ) from exc
+    raise RuntimeError(
+        "No published Business Brain found. Run `cerebrum validate` and "
+        "`cerebrum publish` first."
+    )
+
+
+def _query_terms(value: str) -> set[str]:
+    return {
+        token.strip(".,:;!?()[]{}\"'").lower()
+        for token in value.split()
+        if len(token.strip(".,:;!?()[]{}\"'")) > 2
+    }
+
+
+@mcp.tool()
+def get_business_context(
+    query: str,
+    role: str,
+    customer_facing: bool = True,
+    limit: int = 8,
+) -> str:
+    """Retrieve approved, versioned Business Brain context for an agent task.
+
+    Only entries emitted by `cerebrum publish` are eligible. Results include
+    memory IDs and the Brain version so downstream agents can cite exactly
+    which approved knowledge governed an action.
+
+    Args:
+        query: The task or question the agent is working on
+        role: Agent role/scope, for example sales, support, or engineering
+        customer_facing: Exclude entries not approved for customer-facing use
+        limit: Maximum approved entries to return (1-20)
+    """
+    ensure_brain()
+    snapshot_path, snapshot = _runtime_snapshot()
+    query_terms = _query_terms(query)
+    normalized_role = role.strip().lower()
+    ranked = []
+
+    for entry in snapshot.get("entries", []):
+        scopes = {str(scope).lower() for scope in entry.get("scope", [])}
+        if normalized_role not in scopes and "all" not in scopes:
+            continue
+        if customer_facing and not entry.get("customer_safe", False):
+            continue
+
+        searchable = " ".join([
+            str(entry.get("id", "")),
+            str(entry.get("authority", "")),
+            str(entry.get("conflict_key", "")),
+            str(entry.get("content", "")),
+        ])
+        overlap = len(query_terms & _query_terms(searchable))
+        authority_bonus = 1 if entry.get("authority") in {
+            "company_policy", "product_truth", "pricing_truth", "legal_policy"
+        } else 0
+        ranked.append((overlap + authority_bonus, entry))
+
+    ranked.sort(key=lambda item: (-item[0], item[1].get("id", "")))
+    selected = [entry for _, entry in ranked[:max(1, min(limit, 20))]]
+    return json.dumps({
+        "schema_version": snapshot.get("schema_version"),
+        "brain_version": snapshot.get("brain_version"),
+        "snapshot": str(snapshot_path),
+        "role": normalized_role,
+        "customer_facing": customer_facing,
+        "entries": selected,
+    }, indent=2)
+
+
 @mcp.tool()
 def add_entry(content: str, layer: str = "episodic") -> str:
     """Add a new memory entry. Writes to local Brain if it exists, otherwise global.

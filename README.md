@@ -9,7 +9,7 @@
 </p>
 <p align="center"><em>Your whole AI memory, as a live neural map — <code>cerebrum map --graph</code></em></p>
 
-Cerebrumma is a portable, git-tracked AI memory layer for developers. It lives in `.cerebrum/` in your repo, works with Claude Code, Cursor, Antigravity and more — with built-in explainability and equity guardrails. No keys. No lock-in. Intelligence that compounds.
+Cerebrumma is a portable, git-tracked memory and governance layer for AI agents. It lives in `.cerebrum/` in your repo, works with Claude Code, Cursor, Antigravity and more — with built-in explainability, approval controls, and equity guardrails. No lock-in. Intelligence that compounds without letting agents invent company policy.
 
 ## Install
 
@@ -51,6 +51,10 @@ cerebrum dream --auto
 
 # Visualize your Brain as an interactive 3D neural map
 cerebrum map --graph
+
+# Validate approved business knowledge, then publish an agent-safe snapshot
+cerebrum validate
+cerebrum publish
 ```
 
 ## How It Works
@@ -63,7 +67,11 @@ Memory lives in five layers inside `.cerebrum/`:
 │   ├── episodic/       ← what happened (auto-captured by git hook)
 │   ├── semantic/       ← distilled facts and knowledge
 │   ├── procedural/     ← skills and protocols (rules you follow)
-│   └── personal/       ← equity rules and preferences
+│   ├── personal/       ← equity rules and preferences
+│   ├── brand/          ← voice rules and approved examples
+│   └── objectives/     ← company and role goals
+├── runtime/
+│   └── brain.json      ← validated snapshot consumed by agents
 ├── embeddings.db       ← local vector index (sqlite-vec)
 ├── logs/               ← audit trail
 └── dream/              ← reflection staging area
@@ -92,6 +100,8 @@ Every entry is plain Markdown with YAML frontmatter — human-readable, git-diff
 | `cerebrum audit` | Audit brain health and decay |
 | `cerebrum search <query>` | Semantic search across the Brain |
 | `cerebrum why <query>` | Contextual trace explaining "why" a rule exists |
+| `cerebrum validate` | Detect conflicts, stale approvals, and unsafe runtime knowledge |
+| `cerebrum publish` | Produce a deterministic, versioned runtime snapshot for agents |
 | `cerebrum config` | Set LLM providers and API keys |
 
 ## Global + Local Brain Hierarchy
@@ -120,7 +130,26 @@ Cerebrumma runs as a local MCP server. Claude Code, Cursor, and Antigravity can 
 }
 ```
 
-Available MCP tools: `read_memory` · `search_memory` · `get_protocols` · `add_entry` · `get_status`
+Available MCP tools: `read_memory` · `search_memory` · `get_protocols` · `add_entry` · `get_status` · `get_business_context`
+
+`get_business_context` reads only the validated runtime snapshot. It filters knowledge by agent role and customer-safety classification, and returns the exact Brain version and memory IDs used so every consequential action can be audited.
+
+## Governed Business Brain
+
+Ordinary memories remain flexible. Knowledge used by autonomous business agents is opt-in and must carry governance metadata such as `status`, `authority`, `owner`, `scope`, `customer_safe`, and `autonomy_level`. Approved runtime entries must pass validation before publication.
+
+```sh
+# Start from the included template
+cp templates/business-entry.md .cerebrum/memory/procedural/policies/refunds.md
+
+# Review conflicts and missing approvals
+cerebrum validate
+
+# Publish .cerebrum/runtime/brain.json
+cerebrum publish
+```
+
+Dream-generated insights cannot become approved runtime truth without an explicit human reviewer. See [Business Brain governance](docs/business-brain.md) for the schema, conflict rules, and controlled learning flow.
 
 ## Dream Cycle (Autopilot Gardener)
 
@@ -165,12 +194,13 @@ Always prefer functional components in React.
 
 - [x] CLI: `init`, `add`, `status`, `hook`, `watch`, `dream`, `map`, `fix`, `brief`
 - [x] Global + local Brain hierarchy
-- [x] MCP server (5 tools, merges both Brains)
+- [x] MCP server (6 tools, including role-scoped business context)
 - [x] Git hook auto-capture (branch + hash + diff stats)
 - [x] Autopilot Dreaming (`dream --auto`) via Gemini/Claude
 - [x] Background Daemon (`launchd`)
 - [x] SQLite-vec embeddings + semantic search
 - [x] Visual Brain Dashboard (`map`)
+- [x] Governed Business Brain validation and deterministic runtime publishing
 - [ ] Templates marketplace
 - [ ] Cloud sync (Pro — $24/mo)
 - [ ] Team Brain (shared repo sync)

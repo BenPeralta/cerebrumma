@@ -2,7 +2,12 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(name = "cerebrum", author, version, about = "Portable, git-tracked AI Brain for developers")]
+#[command(
+    name = "cerebrum",
+    author,
+    version,
+    about = "Portable, git-tracked AI Brain for developers"
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
@@ -18,7 +23,10 @@ pub enum Commands {
     /// Add a new entry to episodic memory
     Add {
         content: String,
-        #[arg(long, help = "Write to the global Brain (~/.cerebrum/) instead of local")]
+        #[arg(
+            long,
+            help = "Write to the global Brain (~/.cerebrum/) instead of local"
+        )]
         global: bool,
     },
     /// Show Brain status
@@ -54,13 +62,9 @@ pub enum Commands {
         action: ConfigAction,
     },
     /// Trace the origin of a specific rule or insight
-    Why {
-        query: String,
-    },
+    Why { query: String },
     /// Semantic search across all memory layers
-    Search {
-        query: String,
-    },
+    Search { query: String },
     /// Digital Janitor: Resolve technical debt flagged in audits
     Fix,
     /// Visualize the Brain: Generate a premium HTML report
@@ -78,6 +82,18 @@ pub enum Commands {
     Brief,
     /// View Brain health and usage statistics
     Stats,
+    /// Validate governed Business Brain entries and fail on unsafe conflicts
+    Validate {
+        /// Print the validation report as JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Publish approved Business Brain knowledge as a deterministic runtime snapshot
+    Publish {
+        /// Output path (defaults to .cerebrum/runtime/brain.json)
+        #[arg(short, long, value_name = "FILE")]
+        output: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -93,10 +109,7 @@ pub enum DaemonAction {
 #[derive(Subcommand)]
 pub enum ConfigAction {
     /// Set a configuration value (e.g. gemini_key)
-    Set {
-        key: String,
-        value: String,
-    },
+    Set { key: String, value: String },
     /// Show current configuration (keys are masked)
     Get,
 }

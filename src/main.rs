@@ -8,6 +8,7 @@ pub mod config;
 pub mod daemon;
 pub mod dreamer;
 pub mod git;
+pub mod governance;
 pub mod memory;
 pub mod ui;
 pub mod vector;
@@ -17,6 +18,7 @@ use config::{run_config, run_stats};
 use daemon::run_daemon_cmd;
 use dreamer::dream_cycle;
 use git::{hook_install, hook_remove};
+use governance::{publish_runtime, run_validate};
 use memory::{add_entry, init_brain, resolve_brain};
 use ui::{handle_template, run_audit, run_brief, run_fix, run_map, show_status};
 use vector::{run_search, run_why};
@@ -50,5 +52,7 @@ async fn main() -> Result<()> {
         Commands::Daemon { action } => run_daemon_cmd(action),
         Commands::Brief => run_brief(),
         Commands::Stats => run_stats(),
+        Commands::Validate { json } => run_validate(json),
+        Commands::Publish { output } => publish_runtime(output),
     }
 }
