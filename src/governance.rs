@@ -81,7 +81,7 @@ fn yaml_key(name: &str) -> Value {
 }
 
 fn string_value(map: &Mapping, name: &str) -> Option<String> {
-    map.get(&yaml_key(name))
+    map.get(yaml_key(name))
         .and_then(|value| match value {
             Value::String(value) => Some(value.trim().to_string()),
             Value::Number(value) => Some(value.to_string()),
@@ -91,11 +91,11 @@ fn string_value(map: &Mapping, name: &str) -> Option<String> {
 }
 
 fn bool_value(map: &Mapping, name: &str) -> Option<bool> {
-    map.get(&yaml_key(name)).and_then(Value::as_bool)
+    map.get(yaml_key(name)).and_then(Value::as_bool)
 }
 
 fn string_list(map: &Mapping, name: &str) -> Vec<String> {
-    match map.get(&yaml_key(name)) {
+    match map.get(yaml_key(name)) {
         Some(Value::Sequence(values)) => values
             .iter()
             .filter_map(Value::as_str)
@@ -156,7 +156,7 @@ fn parse_candidate(brain: &Path, path: &Path) -> Result<Option<Candidate>> {
     let has_governance = runtime
         || ["status", "authority", "owner", "scope", "autonomy_level"]
             .iter()
-            .any(|key| map.contains_key(&yaml_key(key)));
+            .any(|key| map.contains_key(yaml_key(key)));
     if !has_governance {
         return Ok(None);
     }
@@ -167,7 +167,9 @@ fn parse_candidate(brain: &Path, path: &Path) -> Result<Option<Candidate>> {
     let status = string_value(&map, "status").unwrap_or_else(|| "draft".to_string());
     let authority = string_value(&map, "authority").unwrap_or_default();
     let owner = string_value(&map, "owner").unwrap_or_default();
-    let scope = string_list(&map, "scope");
+    let mut scope = string_list(&map, "scope");
+    scope.sort();
+    scope.dedup();
     let customer_safe = bool_value(&map, "customer_safe").unwrap_or(false);
     let autonomy_level =
         string_value(&map, "autonomy_level").unwrap_or_else(|| "observe".to_string());
@@ -266,9 +268,9 @@ fn validate_candidates(
 ) -> ValidationReport {
     let now = Utc::now();
     let mut ids = HashSet::new();
-    let all_ids: HashSet<&str> = candidates
+    let by_id: HashMap<&str, &GovernedEntry> = candidates
         .iter()
-        .map(|candidate| candidate.entry.id.as_str())
+        .map(|candidate| (candidate.entry.id.as_str(), &candidate.entry))
         .collect();
     let mut active_conflicts: HashMap<(&str, &str), &GovernedEntry> = HashMap::new();
 
@@ -339,14 +341,24 @@ fn validate_candidates(
             );
         }
         for superseded in &entry.supersedes {
-            if !all_ids.contains(superseded.as_str()) {
-                push_issue(
+            match by_id.get(superseded.as_str()) {
+                None => push_issue(
                     &mut issues,
                     Severity::Error,
                     "unknown_supersedes",
                     entry,
                     format!("supersedes unknown id '{superseded}'"),
-                );
+                ),
+                Some(target) if target.conflict_key != entry.conflict_key => push_issue(
+                    &mut issues,
+                    Severity::Warning,
+                    "cross_key_supersedes",
+                    entry,
+                    format!(
+                        "supersedes '{superseded}', which has a different conflict_key; it will be dropped from publication"
+                    ),
+                ),
+                Some(_) => {}
             }
         }
         if entry.expires_at.is_some()
@@ -528,6 +540,21 @@ pub fn publish_runtime(output: Option<PathBuf>) -> Result<()> {
         entries,
     };
     let output = output.unwrap_or_else(|| brain.join("runtime/brain.json"));
+    // Republishing identical knowledge leaves the file untouched, so a tracked
+    // snapshot only changes in git when the Brain itself changes.
+    let existing_version = fs::read_to_string(&output)
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|json| json["brain_version"].as_str().map(ToOwned::to_owned));
+    if existing_version.as_deref() == Some(brain_version.as_str()) {
+        println!(
+            "{} Business Brain {} unchanged",
+            "✓".green().bold(),
+            &brain_version[..12]
+        );
+        println!("   {} entries → {}", snapshot.entry_count, output.display());
+        return Ok(());
+    }
     if let Some(parent) = output.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -609,6 +636,35 @@ mod tests {
             .issues
             .iter()
             .any(|issue| issue.code == "unreviewed_reflection"));
+    }
+
+    #[test]
+    fn repeated_scope_does_not_conflict_with_itself() {
+        let brain = std::env::temp_dir().join(format!("cerebrum-scope-{}", std::process::id()));
+        let path = brain.join("memory/semantic/pricing.md");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(
+            &path,
+            "---\nid: pricing\nruntime: true\nstatus: approved\nauthority: product_truth\n\
+             owner: founder\nscope: [sales, sales]\nautonomy_level: draft\n\
+             conflict_key: pricing.trial_days\n---\n\nTrials last 14 days.\n",
+        )
+        .unwrap();
+        let report = validate_brain(&brain);
+        fs::remove_dir_all(&brain).unwrap();
+        assert!(report.valid, "{:?}", report.issues);
+    }
+
+    #[test]
+    fn warns_when_superseding_a_different_conflict_key() {
+        let old = candidate("refunds-v1", Some("policy.refunds"));
+        let mut new = candidate("pricing-v2", Some("pricing.trial_days"));
+        new.entry.supersedes.push(old.entry.id.clone());
+        let report = validate_candidates(&[old, new], vec![]);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.code == "cross_key_supersedes"));
     }
 
     #[test]

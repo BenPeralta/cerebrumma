@@ -30,6 +30,15 @@ truth.
 
 Start from [`templates/business-entry.md`](../templates/business-entry.md).
 
+Approval is enforced by review, not by the files themselves: anyone (or any
+agent) with write access can type `status: approved` and `reviewed_by`. Treat
+`.cerebrum/memory/` changes like code — require pull-request review, e.g. with
+a CODEOWNERS rule:
+
+```text
+/.cerebrum/memory/  @your-org/brain-owners
+```
+
 ## Validate before agents act
 
 ```sh
@@ -68,6 +77,14 @@ time. Publishing unchanged knowledge produces the same identity.
 The `get_business_context` MCP tool accepts a task query and agent role. It
 returns only knowledge from the published snapshot, filtered by role and—by
 default—`customer_safe: true`.
+
+Entries whose `expires_at` has passed, or whose `effective_at` has not yet
+arrived, are re-checked at read time and withheld even if the snapshot is stale.
+
+Role and customer-safety filtering keep agents on-task; they are not access
+control. The calling agent declares its own `role`, so do not put knowledge in
+a snapshot that a given agent must never see — publish separate snapshots
+(`cerebrum publish --output`) per trust boundary instead.
 
 Every result includes memory IDs and the Brain version. Agents should record
 both with their drafts and actions so decisions remain explainable and

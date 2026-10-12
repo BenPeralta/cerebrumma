@@ -124,6 +124,30 @@ def _runtime_snapshot() -> tuple[Path, dict]:
     )
 
 
+def _parse_time(value) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _is_live(entry: dict, now: datetime) -> bool:
+    """Re-check the approval window at read time.
+
+    A snapshot can outlive an entry's expiry (or predate its effective date),
+    so publication-time filtering alone is not enough.
+    """
+    expires_at = _parse_time(entry.get("expires_at"))
+    effective_at = _parse_time(entry.get("effective_at"))
+    if expires_at and expires_at <= now:
+        return False
+    if effective_at and effective_at > now:
+        return False
+    return True
+
+
 def _query_terms(value: str) -> set[str]:
     return {
         token.strip(".,:;!?()[]{}\"'").lower()
@@ -156,8 +180,11 @@ def get_business_context(
     query_terms = _query_terms(query)
     normalized_role = role.strip().lower()
     ranked = []
+    now = datetime.now(timezone.utc)
 
     for entry in snapshot.get("entries", []):
+        if not _is_live(entry, now):
+            continue
         scopes = {str(scope).lower() for scope in entry.get("scope", [])}
         if normalized_role not in scopes and "all" not in scopes:
             continue
@@ -188,6 +215,9 @@ def get_business_context(
     }, indent=2)
 
 
+_WRITABLE_LAYERS = {"episodic", "semantic", "personal"}
+
+
 @mcp.tool()
 def add_entry(content: str, layer: str = "episodic") -> str:
     """Add a new memory entry. Writes to local Brain if it exists, otherwise global.
@@ -197,6 +227,8 @@ def add_entry(content: str, layer: str = "episodic") -> str:
         layer: Target layer — episodic | semantic | personal
     """
     ensure_brain()
+    if layer not in _WRITABLE_LAYERS:
+        raise ValueError(f"layer must be one of: {', '.join(sorted(_WRITABLE_LAYERS))}")
     brain = brain_paths()[0]  # local wins if present, else global
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H_%M_%S_%f")[:-3]  # ms precision
     entry = (

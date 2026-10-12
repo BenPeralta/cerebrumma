@@ -6,7 +6,7 @@ use std::path::PathBuf;
     name = "cerebrum",
     author,
     version,
-    about = "Portable, git-tracked AI Brain for developers"
+    about = "Portable, git-tracked memory and governance for AI agents"
 )]
 pub struct Cli {
     #[command(subcommand)]
