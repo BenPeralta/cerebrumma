@@ -86,6 +86,22 @@ install_prebuilt() {
     return 1
   fi
 
+  # Verify against the checksum CI published with the release. A mismatch or a
+  # missing checksum is fatal — never fall back to installing an unverified file.
+  curl -fsSL -o "$TARBALL.sha256" "$URL.sha256" \
+    || die "Could not download checksum for cerebrum-${TARGET}.tar.gz"
+  EXPECTED=$(awk '{print $1}' "$TARBALL.sha256")
+  if command -v sha256sum >/dev/null 2>&1; then
+    ACTUAL=$(sha256sum "$TARBALL" | awk '{print $1}')
+  elif command -v shasum >/dev/null 2>&1; then
+    ACTUAL=$(shasum -a 256 "$TARBALL" | awk '{print $1}')
+  else
+    die "Need sha256sum or shasum to verify the download"
+  fi
+  [ -n "$EXPECTED" ] && [ "$EXPECTED" = "$ACTUAL" ] \
+    || die "Checksum mismatch for cerebrum-${TARGET}.tar.gz — aborting"
+  ok "Checksum verified (sha256 $(printf %.12s "$ACTUAL")…)"
+
   tar -xzf "$TARBALL" -C "$SRC_DIR" || return 1
   EXTRACTED="$SRC_DIR/cerebrum-${TARGET}/cerebrum"
   [ -f "$EXTRACTED" ] || return 1

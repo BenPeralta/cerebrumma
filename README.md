@@ -17,7 +17,15 @@ Cerebrumma is a portable, git-tracked memory and governance layer for AI agents.
 curl -fsSL https://get.cerebrumma.com | sh
 ```
 
-Downloads a prebuilt `cerebrum` binary for your platform (no compiler needed), installs the MCP server, and configures Claude Code automatically. Requires macOS (Apple Silicon or Intel) or Linux (x86_64).
+Downloads a prebuilt `cerebrum` binary for your platform (no compiler needed), verifies its SHA-256 checksum against the GitHub release, installs the MCP server, and configures Claude Code automatically. Requires macOS (Apple Silicon or Intel) or Linux (x86_64). No telemetry, no account.
+
+Prefer to read it first? It's [one short script](install.sh):
+
+```sh
+curl -fsSL https://get.cerebrumma.com -o install.sh
+less install.sh
+sh install.sh
+```
 
 Or with [Homebrew](https://brew.sh):
 
