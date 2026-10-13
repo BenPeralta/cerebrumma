@@ -5,189 +5,124 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cerebrumma · {{project_name}}</title>
 <style>
+:root{
+  --bg:#0a0b0e;
+  --ink:#f4f5f7;
+  --muted:rgba(226,232,240,.46);
+  --faint:rgba(226,232,240,.26);
+  --glass:rgba(22,24,30,.72);
+  --line:rgba(255,255,255,.07);
+  --sans:"Inter","SF Pro Display",-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+}
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#000;overflow:hidden;font-family:'Outfit',system-ui,sans-serif}
-canvas{display:block}
-
-#loading{
-  position:fixed;inset:0;background:#000;z-index:200;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.2rem;
-  transition:opacity .8s
+html,body{height:100%}
+body{
+  background:var(--bg);
+  background-image:radial-gradient(ellipse 70% 60% at 50% 46%,#16181e 0%,#0d0e12 55%,var(--bg) 100%);
+  color:var(--ink);font-family:var(--sans);overflow:hidden;
+  -webkit-font-smoothing:antialiased;
 }
-.ld-logo{font-size:1.1rem;font-weight:700;letter-spacing:.18em;color:rgba(0,212,255,.8);text-transform:uppercase}
-.ld-bar{width:220px;height:1px;background:rgba(255,255,255,.08);overflow:hidden;position:relative}
-.ld-fill{height:100%;background:linear-gradient(90deg,#00d4ff,#8855ff,#ff44aa);animation:ldfill 1.8s ease-out forwards}
-@keyframes ldfill{from{width:0}to{width:100%}}
+canvas{display:block;position:fixed;inset:0;cursor:grab}
+canvas:active{cursor:grabbing}
 
-#ui{position:fixed;inset:0;pointer-events:none}
+/* brand */
+#brand{
+  position:fixed;top:22px;left:24px;display:flex;align-items:center;gap:10px;
+  pointer-events:none;user-select:none
+}
+#brand .dot{width:8px;height:8px;border-radius:50%;background:#eb5e28;box-shadow:0 0 12px rgba(235,94,40,.7)}
+#brand .name{font-size:11px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+#brand .proj{font-size:11px;color:var(--faint);letter-spacing:.04em}
 
-/* top bar */
-#topbar{
-  position:absolute;top:0;left:0;right:0;
-  padding:1.4rem 2.2rem;
-  display:flex;align-items:center;justify-content:space-between;
-  background:linear-gradient(to bottom,rgba(0,0,0,.75),transparent)
+/* panel */
+#panel{position:fixed;top:18px;right:18px;width:272px;display:flex;flex-direction:column;gap:10px;z-index:10}
+.card{
+  background:var(--glass);backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%);
+  border:1px solid var(--line);border-radius:16px;
 }
-.brand{display:flex;align-items:center;gap:.9rem}
-.pulse-dot{
-  width:10px;height:10px;border-radius:50%;
-  background:#eb5e28;
-  box-shadow:0 0 10px #eb5e28,0 0 20px rgba(235,94,40,.4);
-  animation:pdot 2.2s ease-in-out infinite
+#phead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:2px 6px 8px}
+#phead .t{font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);line-height:1.5}
+#phead .n{font-family:var(--mono);font-size:12px;color:var(--ink)}
+#layers{padding:5px;display:flex;flex-direction:column;gap:2px}
+.row{
+  all:unset;cursor:pointer;display:flex;align-items:center;justify-content:space-between;
+  padding:9px 12px;border-radius:11px;font-size:13px;font-weight:600;color:rgba(226,232,240,.72);
+  transition:background .18s,color .18s
 }
-@keyframes pdot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:.6}}
-.brand-name{font-size:1.05rem;font-weight:700;letter-spacing:.1em;color:#fff;text-transform:uppercase}
-.brand-tag{font-size:.6rem;letter-spacing:.22em;color:rgba(0,212,255,.6);text-transform:uppercase;margin-top:.1rem}
-.stats{font-size:.68rem;color:rgba(148,163,184,.45);letter-spacing:.08em;text-transform:uppercase;margin-top:.2rem}
-.stats b{color:rgba(235,94,40,.9);font-weight:600}
+.row:hover{background:rgba(255,255,255,.05);color:var(--ink)}
+.row .c{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--faint)}
+.row.on{background:var(--accent);color:#0a0b0e}
+.row.on .c{color:rgba(10,11,14,.62)}
+.row:focus-visible{outline:2px solid rgba(255,255,255,.4);outline-offset:-2px}
+#count{display:flex;align-items:center;justify-content:space-between;padding:12px 12px 12px 16px}
+#count .big{display:flex;align-items:baseline;gap:8px}
+#count .big b{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.02em}
+#count .big span{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+#count .leg{display:flex;align-items:center;gap:6px;margin-top:5px;font-size:10.5px;color:var(--faint)}
+#count .leg i{width:6px;height:6px;border-radius:50%;background:var(--accent,#94a3b8)}
+#reset{
+  all:unset;cursor:pointer;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+  background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--muted);transition:background .18s,color .18s
+}
+#reset:hover{background:rgba(255,255,255,.12);color:var(--ink)}
+#reset:focus-visible{outline:2px solid rgba(255,255,255,.4)}
 
-/* legend */
-#legend{
-  position:absolute;bottom:2rem;left:2rem;
-  background:rgba(4,4,20,.82);backdrop-filter:blur(22px);
-  border:1px solid rgba(255,255,255,.06);border-radius:16px;
-  padding:.95rem 1.2rem;display:flex;flex-direction:column;gap:.55rem
+/* tooltip */
+#tip{
+  position:fixed;z-index:20;pointer-events:none;max-width:320px;
+  padding:11px 14px 12px;border-radius:12px;
+  background:linear-gradient(180deg,rgba(24,28,38,.94),rgba(14,16,22,.94));
+  border:1px solid rgba(255,255,255,.08);box-shadow:0 12px 40px rgba(0,0,0,.45);
+  opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s
 }
-.lt{font-size:.56rem;text-transform:uppercase;letter-spacing:.14em;color:rgba(148,163,184,.38);margin-bottom:.1rem}
-.lr{display:flex;align-items:center;gap:.6rem;font-size:.77rem;color:rgba(148,163,184,.6)}
-.ld{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+#tip.on{opacity:1;transform:none}
+#tip .k{font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:rgba(226,232,240,.42);margin-bottom:4px}
+#tip .v{font-size:14px;font-weight:650;line-height:1.35;color:#fff}
 
 /* hint */
 #hint{
-  position:absolute;bottom:2rem;right:2rem;
-  font-size:.64rem;color:rgba(148,163,184,.3);text-align:right;line-height:1.9
-}
-kbd{
-  font-family:monospace;background:rgba(255,255,255,.04);
-  border:1px solid rgba(255,255,255,.07);border-radius:4px;
-  padding:.02rem .38rem;color:rgba(203,213,225,.35)
+  position:fixed;bottom:18px;left:0;right:0;text-align:center;pointer-events:none;
+  font-size:11px;color:var(--faint);letter-spacing:.02em;padding:0 16px
 }
 
-/* node label */
-#tip{
-  position:fixed;pointer-events:none;z-index:50;
-  background:rgba(4,4,22,.94);backdrop-filter:blur(22px);
-  border:1px solid rgba(0,212,255,.18);border-radius:13px;
-  padding:.7rem 1rem;max-width:290px;
-  opacity:0;transition:opacity .12s;
-  box-shadow:0 0 30px rgba(0,212,255,.08),0 18px 50px rgba(0,0,0,.85);
-  transform:translate(-50%,calc(-100% - 18px))
-}
-#tip .ty{font-size:.58rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-bottom:.3rem}
-#tip .tx{font-size:.8rem;color:rgba(226,232,240,.85);line-height:1.4}
-#tip .tm{margin-top:.45rem;font-size:.62rem;color:rgba(148,163,184,.45);display:flex;gap:.9rem}
+/* hidden until the graph is built, so the panel never flashes "0 memories" */
+#panel,#hint{opacity:0;transition:opacity .5s ease}
+body.ready #panel,body.ready #hint{opacity:1}
 
-/* ── List panel ── */
-#topbar{ right:340px }
-#hint{ right:360px }
-#panel{
-  position:fixed; top:0; right:0; bottom:0; width:340px; z-index:40;
-  background:rgba(4,4,20,.82); backdrop-filter:blur(24px);
-  border-left:1px solid rgba(255,255,255,.06);
-  display:flex; flex-direction:column;
+@media (max-width:640px){
+  #panel{top:auto;bottom:44px;left:16px;right:16px;width:auto}
+  #layers{flex-direction:row;overflow-x:auto}
+  .row{white-space:nowrap;gap:8px}
+  #brand .proj{display:none}
+  #hint{font-size:10px}
 }
-#phead{ padding:1.3rem 4.5rem 1rem 1.2rem; border-bottom:1px solid rgba(255,255,255,.05) }
-#search{
-  width:100%; padding:.6rem 1.1rem; font-family:inherit; font-size:.82rem;
-  color:#e2e8f0; background:rgba(255,255,255,.05);
-  border:1px solid rgba(255,255,255,.08); border-radius:99px; outline:none;
-}
-#search::placeholder{ color:rgba(148,163,184,.4) }
-#search:focus{ border-color:rgba(235,94,40,.55) }
-#list{ flex:1; overflow-y:auto; padding:0 .8rem .8rem }
-#list::-webkit-scrollbar{ width:8px }
-#list::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.08); border-radius:4px }
-.lgroup{ margin-bottom:.9rem }
-.lgh{
-  display:flex; align-items:center; gap:.5rem; position:sticky; top:0; z-index:2;
-  margin:0 -.8rem; padding:.55rem 1.3rem;
-  font-size:.58rem; text-transform:uppercase; letter-spacing:.14em;
-  color:rgba(148,163,184,.6); background:#07071a;
-  border-bottom:1px solid rgba(255,255,255,.05);
-}
-.lgh .ld{ width:8px; height:8px; border-radius:50% }
-.lgc{ margin-left:auto; color:rgba(148,163,184,.35) }
-.lrow{
-  display:flex; align-items:center; gap:.6rem; padding:.4rem .55rem;
-  border-radius:9px; cursor:pointer; transition:background .12s;
-}
-.lrow:hover, .lrow.active{ background:rgba(235,94,40,.14) }
-.lrow.active{ box-shadow:inset 2px 0 0 #eb5e28 }
-.lrd{ width:7px; height:7px; border-radius:50%; flex-shrink:0 }
-.lrt{ font-size:.78rem; color:rgba(203,213,225,.78); line-height:1.35;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
-.lrow.active .lrt{ color:#fff }
-
-/* ── Floating labels ── */
-#labels{ position:fixed; inset:0; z-index:30; pointer-events:none }
-.flabel{
-  position:absolute; transform:translate(-50%,-150%); white-space:nowrap;
-  padding:.14rem .5rem; border-radius:7px; pointer-events:none;
-  background:rgba(4,4,22,.72); backdrop-filter:blur(6px);
-}
-.flabel.focus{
-  display:flex; flex-direction:column; gap:.15rem; max-width:240px; white-space:normal;
-  padding:.5rem .7rem; border-radius:10px; z-index:2; transform:translate(-50%,-160%);
-  background:rgba(4,4,22,.9); border:1px solid rgba(235,94,40,.4);
-  box-shadow:0 0 24px rgba(235,94,40,.14);
-}
-.fl-layer{ font-size:.56rem; font-weight:700; text-transform:uppercase; letter-spacing:.12em }
-.fl-text{ font-size:.8rem; color:#fff; line-height:1.3 }
-.flabel.nbr{ color:rgba(203,213,225,.72); font-size:.72rem; text-shadow:0 1px 4px #000 }
-
-/* toggle button + sidebar collapse */
-#ptoggle{
-  position:fixed; top:1.3rem; right:1.2rem; z-index:60;
-  width:38px; height:38px; border-radius:11px; line-height:1;
-  background:rgba(4,4,20,.7); backdrop-filter:blur(20px);
-  border:1px solid rgba(255,255,255,.1); color:rgba(235,94,40,.9);
-  font-size:1rem; cursor:pointer; display:flex; align-items:center; justify-content:center;
-  transition:background .15s, border-color .15s;
-}
-#ptoggle:hover{ background:rgba(235,94,40,.14); border-color:rgba(235,94,40,.45) }
-#panel{ transition:transform .35s cubic-bezier(.4,0,.2,1) }
-body.panel-collapsed #panel{ transform:translateX(100%) }
-body.panel-collapsed #topbar{ right:0 }
-body.panel-collapsed #hint{ right:2rem }
+@media (prefers-reduced-motion:reduce){ #tip{transition:none} }
 </style>
 </head>
 <body>
+<canvas id="c" aria-label="3D map of memories"></canvas>
 
-<div id="loading">
-  <div class="ld-logo">Initializing Neural Map</div>
-  <div class="ld-bar"><div class="ld-fill"></div></div>
-</div>
-
-<canvas id="c"></canvas>
-
-<div id="ui">
-  <div id="topbar">
-    <div class="brand">
-      <div class="pulse-dot"></div>
-      <div>
-        <div class="brand-name">Cerebrumma</div>
-        <div class="stats"><b id="nc">0</b> memories &nbsp;·&nbsp; <b id="ec">0</b> connections &nbsp;·&nbsp; <b id="lc">5</b> layers</div>
-      </div>
-    </div>
-  </div>
-  <div id="legend">
-    <div class="lt">Memory Layers</div>
-  </div>
-  <div id="hint">
-    drag a <kbd>node</kbd> to move &nbsp; drag <kbd>space</kbd> to orbit<br>
-    scroll to <kbd>zoom</kbd> &nbsp; hover to <kbd>inspect</kbd>
-  </div>
-</div>
-
-<button id="ptoggle" title="Toggle memory list" aria-label="Toggle memory list">☰</button>
+<div id="brand"><span class="dot"></span><span class="name">Cerebrumma</span><span class="proj">{{project_name}}</span></div>
 
 <div id="panel">
-  <div id="phead">
-    <input id="search" type="text" placeholder="Search memories…" autocomplete="off" />
+  <div class="card" style="padding:12px 6px 6px">
+    <div id="phead"><div class="t">Memories in<br>{{project_name}}</div><div class="n" id="total">0</div></div>
+    <div id="layers" role="tablist" aria-label="Memory layers"></div>
   </div>
-  <div id="list"></div>
+  <div class="card" id="count">
+    <div>
+      <div class="big"><b id="cnum">0</b><span>memories</span></div>
+      <div class="leg"><i></i>1 point = 1 memory</div>
+    </div>
+    <button id="reset" title="Reset view" aria-label="Reset view">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+    </button>
+  </div>
 </div>
-<div id="labels"></div>
+
+<div id="tip"><div class="k"></div><div class="v"></div></div>
+<div id="hint">Drag to rotate · Shift + drag to pan · Scroll to zoom · Hover a point to name it</div>
 
 <script type="application/json" id="graph-data">{{graph_data}}</script>
 
@@ -4059,174 +3994,27 @@ three/build/three.module.js:
 
 <script type="module">
 const THREE = window.THREE;
-const { OrbitControls, EffectComposer, RenderPass, UnrealBloomPass, OutputPass } = window.__THREE_ADDONS__;
+const { OrbitControls } = window.__THREE_ADDONS__;
 
-// ── Layer config ─────────────────────────────────────────────────────────────
+// Golden angle (~137.5°). Memories are distributed around their topic hub on a
+// golden spiral wrapped around a sphere, so every topic reads as a small 3D
+// galaxy from any angle.
+const GA = Math.PI * (3 - Math.sqrt(5));
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const STATIC = REDUCED || location.hash === '#static';   // skip the intro (screenshots)
+
+// ── Layers: each owns a hue family; topics drift within it ───────────────────
 const LAYERS = {
-  Episodic:   { hex:'#00d4ff', c: new THREE.Color(0x00d4ff) },
-  Semantic:   { hex:'#9966ff', c: new THREE.Color(0x9966ff) },
-  Procedural: { hex:'#00ff99', c: new THREE.Color(0x00ff99) },
-  Personal:   { hex:'#ff3399', c: new THREE.Color(0xff3399) },
-  Reflection: { hex:'#ffaa00', c: new THREE.Color(0xffaa00) },
-  Other:      { hex:'#94a3b8', c: new THREE.Color(0x94a3b8) },
+  Episodic:   { hue: 196, sat: .80, lit: .58 },
+  Semantic:   { hue: 262, sat: .74, lit: .64 },
+  Procedural: { hue: 150, sat: .70, lit: .55 },
+  Personal:   { hue: 328, sat: .76, lit: .62 },
+  Reflection: { hue:  34, sat: .88, lit: .58 },
+  Other:      { hue: 218, sat: .14, lit: .62 },
 };
-const LAYER_ORDER = ['Episodic','Semantic','Procedural','Personal','Reflection','Other'];
+const ORDER = ['Episodic','Semantic','Procedural','Personal','Reflection','Other'];
+const layerCss = l => `hsl(${LAYERS[l].hue} ${Math.round(LAYERS[l].sat*100)}% ${Math.round(LAYERS[l].lit*100)}%)`;
 
-// ── Demo memory data (fallback when the brain is empty) ──────────────────────
-const RAW_DEMO = [
-  ['Episodic','Shipped v0.1 of cerebrumma CLI to GitHub'],
-  ['Episodic','Debugged fastembed model download hang on first run'],
-  ['Episodic','Integrated sqlite-vec for vector similarity search'],
-  ['Episodic','First successful cerebrum search returning ranked results'],
-  ['Episodic','Rewrote daemon to use tokio async runtime'],
-  ['Episodic','App Store rejection #1 — privacy manifest missing'],
-  ['Episodic','App Store rejection #2 — entitlements mismatch'],
-  ['Episodic','Resolved paywall layout spacing for Popcorn Reader'],
-  ['Episodic','Onboarded first beta tester via TestFlight'],
-  ['Episodic','Discovered memory layer classification bug in path parser'],
-  ['Episodic','Fixed player UI layout regression after SwiftUI update'],
-  ['Episodic','Merged cerebrum map --graph feature branch'],
-  ['Episodic','First successful neural map render with 4 nodes'],
-  ['Episodic','Debugged TDZ crash in brain_graph.html JS'],
-  ['Episodic','Set up Firebase project for mobile backend'],
-  ['Episodic','Configured GA4 analytics for iOS app'],
-  ['Episodic','Migrated from manual embeddings to fastembed BGE model'],
-  ['Episodic','Wrote install.sh bootstrap script'],
-  ['Episodic','Added git hook auto-capture for commit context'],
-  ['Episodic','Ran first cerebrum audit on cerebrumma codebase'],
-  ['Episodic','Rebuilt Cargo workspace after dependency conflict'],
-  ['Episodic','Hit 1.6MB embeddings.db with only 4 entries — schema bloat'],
-  ['Episodic','Implemented YAML frontmatter in all memory files'],
-  ['Episodic','Set up MCP server for IDE integration'],
-  ['Episodic','Deployed first dream/reflection cycle successfully'],
-  ['Episodic','Tested cerebrum why query on glassmorphism insight'],
-  ['Episodic','Confirmed cosine similarity threshold at 0.55'],
-  ['Episodic','Wrote ROADMAP.md with 5-phase vision'],
-  ['Episodic','Opened cerebrumma to equitable-by-design principles'],
-  ['Episodic','Resolved SwiftUI subscription paywall button spacing'],
-  ['Semantic','Cerebrumma bridges AI and developer workflow via persistent memory'],
-  ['Semantic','Vector threshold 0.55 balances recall vs precision for personal brains'],
-  ['Semantic','BGE-small-EN-v1.5 best perf/quality tradeoff for 384-dim embeddings'],
-  ['Semantic','sqlite-vec stores float[384] as raw little-endian f32 blobs'],
-  ['Semantic','Glassmorphism + deep purple gradients define the Cerebrumma aesthetic'],
-  ['Semantic','Force graphs need interaction state hoisted before animation loop'],
-  ['Semantic','App Store rejections come in pairs — fix one and find another'],
-  ['Semantic','Firebase privacy manifest required for SDK >= 10.x'],
-  ['Semantic','TDZ crashes happen when let variables are accessed before declaration'],
-  ['Semantic','Memory layers map to cognitive science: episodic, semantic, procedural'],
-  ['Semantic','Outfit 800 weight -0.03em tracking creates premium feel'],
-  ['Semantic','DAMPING=0.88 GRAVITY=0.01 keeps graph alive without diverging'],
-  ['Semantic','Edge opacity min 0.18 is visibility floor for dark-mode canvas graphs'],
-  ['Semantic','Auto-fit view after settle lets physics compute accurate bounding box'],
-  ['Semantic','cerebrum map --graph is the most compelling demo for new users'],
-  ['Semantic','Session briefs reduce AI onboarding cost by 60-80 percent'],
-  ['Semantic','Reflection cycles distill episodic logs into semantic insights'],
-  ['Semantic','The pitch vs Obsidian: zero manual links, all inferred from meaning'],
-  ['Semantic','MCP integration lets any IDE read the brain without CLI dependency'],
-  ['Semantic','Rust fastembed blocks the thread — needs spawn_blocking in async'],
-  ['Semantic','Local LLM fallback is the privacy escape hatch for enterprise users'],
-  ['Semantic','cerebrum search is most useful when brain has 50+ diverse entries'],
-  ['Semantic','GA4 custom events should mirror the memory layer taxonomy'],
-  ['Semantic','Top-3 neighbors per node keeps graph readable without losing connectivity'],
-  ['Semantic','Hub nodes emerge naturally around foundational concepts at 5+ edges'],
-  ['Semantic','Fixed home positions prevent physics chaos in cluster-based graphs'],
-  ['Semantic','The brain map is the screenshottable moment for landing page credibility'],
-  ['Semantic','daemon.log rotation prevents unbounded disk growth in long-lived sessions'],
-  ['Semantic','Three.js InstancedMesh with MeshBasicMaterial gives bloom-ready glow'],
-  ['Semantic','UnrealBloomPass threshold 0.1 makes node colors bloom without wash'],
-  ['Procedural','All CLI output: magenta for actions, green for success, yellow for hints'],
-  ['Procedural','New CLI commands must follow the Cerebrumma Aesthetic in ui.rs'],
-  ['Procedural','cerebrum init must create both embeddings.db and memory/ subdirs'],
-  ['Procedural','Every memory file gets YAML frontmatter: date, layer, source, tags'],
-  ['Procedural','Use cargo build --release for benchmarks, never debug builds'],
-  ['Procedural','Templates in templates/ embedded via include_str! at compile time'],
-  ['Procedural','brain_graph.html is always regenerated — never edit .cerebrum/ output'],
-  ['Procedural','Git hooks capture context automatically; never require manual add'],
-  ['Procedural','Rust binary must stay under 10MB stripped for install.sh viability'],
-  ['Procedural','All async embedding calls go through tokio::spawn_blocking'],
-  ['Procedural','Error messages always suggest the corrective command in yellow'],
-  ['Procedural','cerebrum search returns top-5 by default, configurable via --k flag'],
-  ['Procedural','Vector DB is append-only; deduplication at query time by path hash'],
-  ['Procedural','Session briefs written to dream/Session-Brief.md, never overwritten'],
-  ['Procedural','Audit prompt includes directory structure + top-50 files content'],
-  ['Procedural','Firebase SDK must include NSPrivacyAccessedAPITypes in manifest'],
-  ['Procedural','SwiftUI views use ViewModifiers not inline modifiers for consistency'],
-  ['Procedural','Analytics events fire on memory write, search, and map generation'],
-  ['Procedural','Use npx -y firebase-tools@latest for all Firebase CLI operations'],
-  ['Procedural','MCP server exposes read-only tools only — writes go through CLI'],
-  ['Personal','We use glassmorphism and deep purple gradients for a premium feel'],
-  ['Personal','Cerebrumma is built for developers who think in systems not just code'],
-  ['Personal','Equitable AI tools must work for non-English speakers and non-experts'],
-  ['Personal','The UI uses accessible contrast ratios and high-readability typography'],
-  ['Personal','Open source core, premium cloud sync — the sustainability model'],
-  ['Personal','Bias toward action: ship rough, iterate fast, document learnings'],
-  ['Personal','Every feature explainable in one sentence to a non-engineer'],
-  ['Personal','The brain belongs to the user — no telemetry without explicit opt-in'],
-  ['Personal','Design for the developer who works alone at midnight with no context'],
-  ['Personal','Cerebrumma should feel like a superpower, not a chore'],
-  ['Personal','Latency matters more than accuracy for daily-use developer tools'],
-  ['Personal','Brain portability is non-negotiable — must survive a hard drive wipe'],
-  ['Personal','Monochrome + one accent color is the brand constraint for all UIs'],
-  ['Personal','We complement Obsidian for AI-native workflows, not compete with it'],
-  ['Personal','Popcorn Reader and cerebrumma share a common design language'],
-  ['Personal','Fair hiring principles apply to contributor onboarding too'],
-  ['Personal','Documentation is a first-class feature, not an afterthought'],
-  ['Personal','The best memory is one the user never had to create manually'],
-  ['Personal','Failure modes should be loud and helpful, not silent and mysterious'],
-  ['Personal','Ship the screenshottable AI brain moment before v1.0'],
-  ['Reflection','Audit: Largest risk is embedding latency blocking CLI UX'],
-  ['Reflection','Audit: Memory deduplication not implemented — DB will bloat over time'],
-  ['Reflection','Audit: No test suite — 100% manual verification is unsustainable'],
-  ['Reflection','Audit: Graph rendering breaks with >500 nodes due to O(n^2) repulsion'],
-  ['Reflection','Audit: install.sh has no rollback on partial failure'],
-  ['Reflection','Reflection: cerebrum audit most valuable when run weekly not ad-hoc'],
-  ['Reflection','Reflection: dream cycle not yet tested with real AI response'],
-  ['Reflection','Reflection: MCP server is the highest-leverage integration surface'],
-  ['Reflection','Reflection: demo data more compelling than real data for early users'],
-  ['Reflection','Reflection: graph viz is the product most shareable artifact'],
-  ['Reflection','Prune: 3 duplicate episodic entries about App Store rejections'],
-  ['Reflection','Prune: audit prompts older than 30 days should be archived'],
-  ['Reflection','Insight: vector search relevance drops below 0.55 — hard cutoff correct'],
-  ['Reflection','Insight: session briefs reduce AI onboarding time significantly'],
-  ['Reflection','Insight: --graph flag is 10x more engaging than the table map'],
-  ['Reflection','Next: implement cerebrum sync for cloud backup'],
-  ['Reflection','Next: add cerebrum forget to remove stale memories'],
-  ['Reflection','Next: WebSocket live updates so graph auto-refreshes on new memories'],
-  ['Reflection','Next: cluster coloring by semantic group not just layer'],
-  ['Reflection','Next: export graph as SVG for landing page embed'],
-  ['Reflection','Next: cerebrum share — public read-only brain snapshot'],
-  ['Reflection','Next: smart pruning — auto-merge near-duplicate memories'],
-  ['Reflection','Next: timeline view — plot memories on a time axis'],
-  ['Reflection','Next: cerebrum ask — RAG-style Q&A over the full brain'],
-  ['Reflection','Next: mobile companion app for capturing memories on the go'],
-  ['Reflection','Next: per-project brain isolation with global fallback'],
-  ['Reflection','Next: browser extension to capture research context'],
-  ['Reflection','Next: Slack/Discord bot integration for team brains'],
-  ['Reflection','Next: diff view showing what changed between reflection cycles'],
-  ['Reflection','Next: 3D neural map with Three.js WebGL visualization'],
-  ['Reflection','Next: voice input integration for hands-free memory capture'],
-  ['Reflection','Next: import/export Obsidian vault as cerebrumma brain'],
-  ['Reflection','Next: semantic clustering auto-discovery via HDBSCAN'],
-];
-
-// Real memory data injected by `cerebrum map`; falls back to the bundled demo
-let GRAPH = {};
-try { GRAPH = JSON.parse(document.getElementById('graph-data').textContent); } catch (_) {}
-const USE_REAL = !!(GRAPH && GRAPH.nodes && GRAPH.nodes.length);
-const RAW = USE_REAL
-  ? GRAPH.nodes.map(n => [ LAYERS[n.layer] ? n.layer : 'Other', n.label ])
-  : RAW_DEMO;
-
-// ── Build node objects ───────────────────────────────────────────────────────
-const nodes = RAW.map((r,i) => ({
-  id: i, label: r[1], layer: r[0],
-  color: LAYERS[r[0]].c.clone(),
-  position: new THREE.Vector3(),
-  salience: .5 + Math.random() * .5,
-  deg: 0,
-}));
-
-// ── Deterministic RNG ────────────────────────────────────────────────────────
 function mkRng(seed) {
   let s = seed;
   return () => {
@@ -4235,561 +4023,573 @@ function mkRng(seed) {
     return ((s ^ s >>> 14) >>> 0) / 4294967296;
   };
 }
-const rng = mkRng(0xDEADC0DE);
+const rng = mkRng(0x9E3779B9);
+const pick = arr => arr[Math.floor(rng() * arr.length)];
 
-// ── Group by layer ───────────────────────────────────────────────────────────
-const byLayer = {};
-nodes.forEach((n,i) => { (byLayer[n.layer] = byLayer[n.layer]||[]).push(i); });
+// ── Demo Brain (shown only when this Brain has no embeddings yet) ────────────
+// A few months of a developer's memory: topics of related entries, with
+// neighbouring topics linked the way real similarity search links them.
+const DEMO_TOPICS = [
+  ['Episodic',   'auth',        ['Fixed refresh-token race in auth middleware','Added passkey sign-in behind a flag','Rotated JWT signing keys','Debugged session expiry on Safari','Moved auth checks into route guards','Patched OAuth callback state check'], ['commit','fix','refactor','debug']],
+  ['Episodic',   'billing',     ['Wired Stripe webhooks to the ledger','Handled failed renewal retries','Backfilled missing invoice rows','Fixed proration on plan downgrade','Added idempotency keys to charges','Reconciled refunds with payouts'], ['commit','fix','investigate']],
+  ['Episodic',   'search',      ['Rebuilt the vector index after schema change','Tuned similarity threshold to 0.55','Cached query embeddings','Fixed empty results for short queries','Added recency boost to ranking','Profiled sqlite-vec scan time'], ['commit','tune','benchmark']],
+  ['Episodic',   'mobile',      ['Resolved paywall button spacing in SwiftUI','Fixed TestFlight build signing','Added privacy manifest for SDKs','Chased a crash on cold launch','Shipped offline reading mode','Reduced app size by 9 MB'], ['commit','ship','fix']],
+  ['Episodic',   'infra',       ['Cross-compiled Intel binary on ARM runner','Cut release v0.2.1','Added checksum verification to installer','Moved DNS to Vercel','Rotated CI secrets','Pinned runner image versions'], ['commit','release','ops']],
+  ['Episodic',   'onboarding',  ['Rewrote the first-run checklist','Added empty-state hints','Shortened signup to one screen','Measured activation drop-off','Added sample data for new users','Fixed tour overlay on small screens'], ['commit','experiment','ship']],
+  ['Semantic',   'retrieval',   ['Top-3 neighbours keep graphs readable','Short queries need lexical fallback','Embedding drift appears after model swaps','Recency matters more than salience for bugs','Cosine 0.55 balances recall and precision','Chunk by meaning, not by length'], ['fact','insight']],
+  ['Semantic',   'product',     ['Activation hinges on the first saved memory','Users share the map more than any table','Developers distrust curl-pipe-sh installs','Brew users skip the MCP setup','The demo sells better than the docs','People return weekly, not daily'], ['fact','insight']],
+  ['Semantic',   'architecture',['Markdown stays the source of truth','The vector index is a cache, not a store','MCP tools must be read-mostly','Runtime snapshots decouple agents from edits','Git history is the audit log','Local-first beats sync for trust'], ['fact','principle']],
+  ['Semantic',   'customers',   ['Agencies want one Brain per client','Founders ask for approval controls first','Teams want per-role knowledge','Solo devs want zero config','Enterprise asks about data residency','Students use it for course notes'], ['fact','signal']],
+  ['Procedural', 'release',     ['Bump Cargo.toml, then tag vX.Y.Z','Bump the Homebrew tap after CI','Never use macos-13 runners','Verify the .sha256 before announcing','Reinstall the binary after template edits','Write release notes from commits'], ['rule','step']],
+  ['Procedural', 'code style',  ['Prefer functional React components','Errors suggest the fixing command','Keep CLI colours consistent','No unwrap() outside tests','Format before every commit','Small modules over large files'], ['rule']],
+  ['Procedural', 'review',      ['Run validate before publish','Approvals go through pull requests','Dream output needs a human reviewer','Check expiry on governed entries','Document every new MCP tool','Test the piped install path'], ['rule','check']],
+  ['Personal',   'voice',       ['Plain language over jargon','Never use gendered UI copy','Write for the developer at midnight','Explain every feature in one sentence','Monochrome plus one accent colour','Loud, helpful failure messages'], ['preference']],
+  ['Personal',   'values',      ['No telemetry without opt-in','The Brain belongs to the user','Ship rough, iterate fast','Equitable tools work for non-experts','Portability is non-negotiable','Docs are a feature'], ['principle']],
+  ['Reflection', 'audits',      ['Embedding latency is the top UX risk','Deduplication will matter at scale','Installer needs rollback on failure','Graph view is the most shareable artifact','Weekly audits beat ad-hoc ones','Stale approvals are the governance risk'], ['audit','insight']],
+  ['Reflection', 'roadmap',     ['Next: signed snapshot distribution','Next: evaluation gate before promotion','Next: team Brains over git','Next: timeline view of memories','Next: smart pruning of near-duplicates','Next: Windows installer'], ['next']],
+];
+// neighbouring topics, linked the way similar memories cross topics
+const DEMO_LINKS = [[0,5],[0,4],[1,7],[2,6],[2,8],[3,7],[4,10],[5,7],[6,8],[7,9],[8,12],[9,7],[10,12],[11,13],[12,15],[13,14],[14,8],[15,6],[16,9],[16,4],[3,11],[1,15]];
 
-// ── 3D cluster positions ─────────────────────────────────────────────────────
-// Episodic at top, 4 others around ring below
-const PETAL_R = 215;
-const clusterCenter = {};
-LAYER_ORDER.forEach((layer, i) => {
-  if (i === 0) {
-    clusterCenter[layer] = new THREE.Vector3(0, 255, 0);
-  } else {
-    const a = ((i-1)/Math.max(1, LAYER_ORDER.length-1)) * Math.PI * 2 - Math.PI / 2;
-    clusterCenter[layer] = new THREE.Vector3(
-      Math.cos(a) * PETAL_R, 15, Math.sin(a) * PETAL_R
-    );
-  }
-});
-
-// Within-cluster: Fibonacci sphere surface + random radius
-const lIdx = {};
-nodes.forEach(n => {
-  lIdx[n.layer] = lIdx[n.layer] || 0;
-  const i   = lIdx[n.layer]++;
-  const tot = byLayer[n.layer].length;
-  const phi   = Math.acos(1 - 2*(i+.5)/tot);
-  const theta = Math.PI * (1+Math.sqrt(5)) * i;
-  const r     = 42 + rng() * 38;
-  const cc    = clusterCenter[n.layer];
-  n.position.set(
-    cc.x + r * Math.sin(phi) * Math.cos(theta),
-    cc.y + r * Math.cos(phi),
-    cc.z + r * Math.sin(phi) * Math.sin(theta)
-  );
-});
-
-// ── Build edges ──────────────────────────────────────────────────────────────
-const edges = [];
-const edgeSeen = new Set();
-const adj = nodes.map(() => []); // adjacency: [{node, edge}]
-
-function addEdge(a, b, w) {
-  if (a === b) return;
-  const k = a < b ? `${a}|${b}` : `${b}|${a}`;
-  if (edgeSeen.has(k)) return;
-  edgeSeen.add(k);
-  const idx = edges.length;
-  edges.push({ s:a, t:b, w });
-  nodes[a].deg++; nodes[b].deg++;
-  adj[a].push({ node:b, edge:idx });
-  adj[b].push({ node:a, edge:idx });
-}
-
-if (USE_REAL) {
-  // Real edges: inferred from embedding similarity by `cerebrum map`
-  GRAPH.edges.forEach(e => addEdge(e.source, e.target, e.weight));
-} else {
-  Object.values(byLayer).forEach(ids => {
-    for (let i = 0; i < ids.length; i++) {
-      const peers = 2 + Math.floor(rng()*3);
-      for (let k = 0; k < peers; k++)
-        addEdge(ids[i], ids[Math.floor(rng()*ids.length)], .6+rng()*.35);
+function buildDemo() {
+  const out = [], links = [];
+  const sizes = DEMO_TOPICS.map(([layer]) => layer === 'Episodic' ? 70 + Math.floor(rng() * 90) : 28 + Math.floor(rng() * 50));
+  const start = [];
+  DEMO_TOPICS.forEach(([layer, topic, seeds, kinds], t) => {
+    start.push(out.length);
+    for (let i = 0; i < sizes[t]; i++) {
+      const base = seeds[i % seeds.length];
+      const label = i < seeds.length ? base
+        : layer === 'Episodic' ? `${pick(kinds)} ${Math.floor(rng() * 0xfffffff).toString(16).slice(0, 7)} · ${base.toLowerCase()}`
+        : `${base} (${topic}, ${pick(kinds)} ${1 + Math.floor(i / seeds.length)})`;
+      out.push({ label, layer });
     }
   });
-  [['Semantic','Episodic',42],['Semantic','Procedural',30],
-   ['Semantic','Personal',26],['Semantic','Reflection',36],
-   ['Episodic','Procedural',20],['Episodic','Reflection',24],
-   ['Personal','Reflection',18],['Procedural','Reflection',15],
-   ['Episodic','Personal',12],['Procedural','Personal',10],
-  ].forEach(([la,lb,n]) => {
-    const aa=byLayer[la]||[], bb=byLayer[lb]||[];
-    for (let k=0;k<n;k++) addEdge(aa[Math.floor(rng()*aa.length)], bb[Math.floor(rng()*bb.length)], .55+rng()*.4);
+  DEMO_TOPICS.forEach((_, t) => {
+    const a = start[t], n = sizes[t];
+    for (let i = 1; i < n; i++) {
+      links.push([a + i, a + Math.floor(rng() * i), .62 + rng() * .3]);       // tree-ish
+      if (rng() < .5) links.push([a + i, a + Math.floor(rng() * n), .58 + rng() * .3]);
+    }
   });
+  DEMO_LINKS.forEach(([p, q]) => {
+    const k = 3 + Math.floor(rng() * 6);
+    for (let i = 0; i < k; i++) links.push([start[p] + Math.floor(rng() * sizes[p]), start[q] + Math.floor(rng() * sizes[q]), .56 + rng() * .1]);
+  });
+  return { nodes: out, links };
 }
 
-// ── Stats ────────────────────────────────────────────────────────────────────
-document.getElementById('nc').textContent = nodes.length;
-document.getElementById('ec').textContent = edges.length;
+// ── Data ─────────────────────────────────────────────────────────────────────
+let GRAPH = {};
+try { GRAPH = JSON.parse(document.getElementById('graph-data').textContent); } catch (_) {}
+const USE_REAL = !!(GRAPH && GRAPH.nodes && GRAPH.nodes.length);
+const DEMO = USE_REAL ? null : buildDemo();
 
-const legEl = document.getElementById('legend');
-LAYER_ORDER.forEach(layer => {
-  if (!byLayer[layer] || !byLayer[layer].length) return; // skip empty layers
-  const c = LAYERS[layer].hex;
-  const row = document.createElement('div'); row.className='lr';
-  row.innerHTML = `<span class="ld" style="background:${c};box-shadow:0 0 8px ${c}88"></span>${layer}`;
-  legEl.appendChild(row);
+const nodes = (USE_REAL
+  ? GRAPH.nodes.map(n => ({ label: n.label || '(empty memory)', layer: LAYERS[n.layer] ? n.layer : 'Other' }))
+  : DEMO.nodes
+).map((n, i) => ({ ...n, id: i }));
+
+const edges = [];
+const adj = nodes.map(() => []);
+const edgeKeys = new Set();
+function addEdge(a, b, w) {
+  if (a === b || a == null || b == null || !nodes[a] || !nodes[b]) return;
+  const k = a < b ? a + '|' + b : b + '|' + a;
+  if (edgeKeys.has(k)) return;
+  edgeKeys.add(k);
+  edges.push({ a, b, w });
+  adj[a].push({ n: b, w }); adj[b].push({ n: a, w });
+}
+if (USE_REAL) GRAPH.edges.forEach(e => addEdge(e.source, e.target, e.weight));
+else DEMO.links.forEach(([a, b, w]) => addEdge(a, b, w));
+
+const byLayer = {};
+nodes.forEach(n => (byLayer[n.layer] = byLayer[n.layer] || []).push(n.id));
+
+// ── Topics ───────────────────────────────────────────────────────────────────
+// Like a skill with the exercises that prove it, a topic is a hub memory with
+// its related memories around it. Topics are connected groups of same-layer
+// similarity edges; very large groups are split by label propagation.
+const MAX_TOPIC = 110;
+const lab = nodes.map(n => n.id);
+const parent = nodes.map(n => n.id);
+const find = x => (parent[x] === x ? x : (parent[x] = find(parent[x])));
+edges.forEach(e => {
+  if (nodes[e.a].layer !== nodes[e.b].layer) return;
+  const ra = find(e.a), rb = find(e.b);
+  if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb);
 });
-document.getElementById('lc').textContent = LAYER_ORDER.filter(l => byLayer[l] && byLayer[l].length).length;
+nodes.forEach(n => { lab[n.id] = find(n.id); });
+// Split oversized groups into balanced topics: seed hubs at the best-connected
+// memories (kept apart), then grow each topic outward breadth-first.
+{
+  const comps = new Map();
+  nodes.forEach(n => { if (!comps.has(lab[n.id])) comps.set(lab[n.id], []); comps.get(lab[n.id]).push(n.id); });
+  for (const ids of comps.values()) {
+    if (ids.length <= MAX_TOPIC) continue;
+    const k = Math.ceil(ids.length / (MAX_TOPIC * .65));
+    const near = new Set(), seeds = [];
+    for (const id of [...ids].sort((p, q) => adj[q].length - adj[p].length || p - q)) {
+      if (seeds.length >= k) break;
+      if (near.has(id)) continue;
+      seeds.push(id);
+      near.add(id);
+      adj[id].forEach(({ n }) => { near.add(n); adj[n].forEach(({ n: m }) => near.add(m)); });
+    }
+    const inComp = new Set(ids), owner = new Map();
+    let frontier = seeds.map(sd => { owner.set(sd, sd); return sd; });
+    while (frontier.length) {
+      const next = [];
+      for (const id of frontier) for (const { n } of adj[id]) {
+        if (!inComp.has(n) || owner.has(n) || nodes[n].layer !== nodes[id].layer) continue;
+        owner.set(n, owner.get(id)); next.push(n);
+      }
+      frontier = next;
+    }
+    ids.forEach(id => { lab[id] = owner.has(id) ? owner.get(id) : seeds[0]; });
+  }
+}
 
-// ── List panel · search · sync · floating labels ─────────────────────────────
-let hoverLock  = false;   // true while the list drives the hover
-let labelState = [];      // [{id, el}] floating labels to reposition each frame
-let focusTarget = null;   // orbit re-center target after a list click
-const NBR_LABEL_CAP = 12; // don't flood hub nodes with labels
-
-const labelsEl = document.getElementById('labels');
-const listEl   = document.getElementById('list');
-const searchEl = document.getElementById('search');
-const panelEl  = document.getElementById('panel');
-const rowEls   = new Array(nodes.length);
-
-// Build the grouped list
-LAYER_ORDER.forEach(layer => {
+const topics = [];          // { layer, members, hub, r, p:Vector3 }
+const topicOf = new Int32Array(nodes.length);
+ORDER.forEach(layer => {
   const ids = byLayer[layer] || [];
   if (!ids.length) return;
-  const grp = document.createElement('div'); grp.className = 'lgroup';
-  const hd  = document.createElement('div'); hd.className = 'lgh';
-  hd.innerHTML = `<span class="ld" style="background:${LAYERS[layer].hex}"></span>${layer}<span class="lgc">${ids.length}</span>`;
-  grp.appendChild(hd);
-  ids.forEach(idx => {
-    const row = document.createElement('div'); row.className = 'lrow';
-    row.innerHTML = `<span class="lrd" style="background:${LAYERS[layer].hex}"></span><span class="lrt"></span>`;
-    row.querySelector('.lrt').textContent = nodes[idx].label;
-    row.addEventListener('mouseenter', () => setHover(idx));
-    row.addEventListener('click',      () => focusNode(idx));
-    rowEls[idx] = row;
-    grp.appendChild(row);
+  const groups = new Map();
+  ids.forEach(id => { if (!groups.has(lab[id])) groups.set(lab[id], []); groups.get(lab[id]).push(id); });
+  const loose = [], list = [];
+  for (const g of groups.values()) { if (g.length > 1) list.push(g); else loose.push(g[0]); }
+  if (loose.length) list.push(loose);                     // unconnected memories share one cloud
+  list.forEach(members => {
+    const inSet = new Set(members);
+    let hub = members[0], hubW = -1;
+    members.forEach(id => {
+      const w = adj[id].reduce((s, { n, w }) => s + (inSet.has(n) ? w : 0), 0) + adj[id].length * 1e-3;
+      if (w > hubW) { hub = id; hubW = w; }
+    });
+    members.forEach(id => { topicOf[id] = topics.length; });
+    topics.push({ layer, members, hub });
   });
-  listEl.appendChild(grp);
 });
+const isHub = new Uint8Array(nodes.length);
+topics.forEach(t => { isHub[t.hub] = 1; });
 
-// Lock graph hover to the list while the pointer is inside the panel
-panelEl.addEventListener('mouseenter', () => hoverLock = true);
-panelEl.addEventListener('mouseleave', () => hoverLock = false);
-
-// Collapse / expand the sidebar
-document.getElementById('ptoggle').addEventListener('click', () => {
-  document.body.classList.toggle('panel-collapsed');
+// ── Topic layout: 3D force simulation ────────────────────────────────────────
+// Linked topics pull together into chains and arches; every topic pushes the
+// others away in proportion to its size.
+const S = 6;                                                     // memory spacing
+topics.forEach(t => { t.r = S * Math.cbrt(t.members.length) + S * 1.2; });
+const T = topics.length;
+const tLinks = new Map();
+edges.forEach(({ a, b }) => {
+  const p = topicOf[a], q = topicOf[b];
+  if (p === q) return;
+  const k = p < q ? p + '|' + q : q + '|' + p;
+  tLinks.set(k, (tLinks.get(k) || 0) + 1);
 });
-
-// Row visibility: while hovering a graph node → show only it + its connections;
-// otherwise → whatever matches the search box.
-function applyListFilter() {
-  const q = searchEl.value.trim().toLowerCase();
-  const filtering = hovId !== -1 && !hoverLock; // graph-driven hover only
-  let keep = null;
-  if (filtering) {
-    keep = new Set([hovId]);
-    adj[hovId].forEach(({ node: nb }) => keep.add(nb));
+const springs = [...tLinks].map(([k, n]) => { const [p, q] = k.split('|').map(Number); return { p, q, n }; });
+const layerIndex = Object.fromEntries(ORDER.map((l, i) => [l, i]));
+const tp = topics.map((t, i) => {
+  // seed on a golden-spiral sphere, grouped loosely by layer
+  const y = 1 - 2 * (i + .5) / Math.max(1, T), rr = Math.sqrt(1 - y * y), a = i * GA;
+  const R = 40 + Math.sqrt(T) * 30;
+  return new THREE.Vector3(Math.cos(a) * rr * R, y * R + layerIndex[t.layer] * 6, Math.sin(a) * rr * R);
+});
+const tv = topics.map(() => new THREE.Vector3());
+const _d = new THREE.Vector3();
+for (let it = 0, iters = T > 300 ? 160 : 360; it < iters; it++) {
+  const cool = 1 - it / iters;
+  for (let i = 0; i < T; i++) for (let j = i + 1; j < T; j++) {
+    _d.subVectors(tp[j], tp[i]);
+    const d = Math.max(_d.length(), 1e-3);
+    const min = topics[i].r + topics[j].r + S * 4;
+    let f = (topics[i].r * topics[j].r) * 2.2 / (d * d);
+    if (d < min) f += (min - d) * .5;
+    _d.multiplyScalar(f / d);
+    tv[i].sub(_d); tv[j].add(_d);
   }
-  nodes.forEach((n, idx) => {
-    const row = rowEls[idx];
-    if (!row) return;
-    const show = filtering ? keep.has(idx) : (!q || n.label.toLowerCase().includes(q));
-    row.style.display = show ? '' : 'none';
-  });
-  document.querySelectorAll('.lgroup').forEach(g => {
-    const rows = [...g.querySelectorAll('.lrow')];
-    const vis  = rows.filter(r => r.style.display !== 'none').length;
-    const c = g.querySelector('.lgc');
-    if (c) c.textContent = vis;
-    g.style.display = vis ? '' : 'none';
-  });
-}
-searchEl.addEventListener('input', applyListFilter);
-
-// Click a row → highlight + gently recenter the orbit on that node
-function focusNode(idx) {
-  hoverLock = true;
-  setHover(idx);
-  focusTarget = nodes[idx].position.clone();
-}
-
-// Whenever hover changes: sync the list row + rebuild floating labels
-function syncAuxUI(id) {
-  rowEls.forEach(r => r && r.classList.remove('active'));
-  if (id !== -1 && rowEls[id]) rowEls[id].classList.add('active');
-  applyListFilter();
-  if (id !== -1 && rowEls[id]) rowEls[id].scrollIntoView({ block: 'nearest' });
-  labelsEl.textContent = '';
-  labelState = [];
-  if (id === -1) return;
-
-  // Neighbor labels (plain text)
-  adj[id].slice(0, NBR_LABEL_CAP).forEach(({ node: nb }) => {
-    const el = document.createElement('div');
-    el.className = 'flabel nbr';
-    el.textContent = nodes[nb].label;
-    labelsEl.appendChild(el);
-    labelState.push({ id: nb, el });
-  });
-
-  // Focus card last, so it renders on top
-  const n = nodes[id];
-  const card = document.createElement('div');
-  card.className = 'flabel focus';
-  card.innerHTML = `<span class="fl-layer" style="color:${LAYERS[n.layer].hex}">${n.layer} · ${n.deg} connections</span><span class="fl-text"></span>`;
-  card.querySelector('.fl-text').textContent = n.label;
-  labelsEl.appendChild(card);
-  labelState.push({ id, el: card });
-}
-
-// Project the floating labels to screen space each frame
-const _pv = new THREE.Vector3();
-function positionLabels() {
-  for (const { id, el } of labelState) {
-    _pv.copy(nodes[id].position).project(camera);
-    if (_pv.z > 1) { el.style.display = 'none'; continue; }
-    el.style.display = '';
-    el.style.left = ((_pv.x * 0.5 + 0.5) * W()) + 'px';
-    el.style.top  = ((-_pv.y * 0.5 + 0.5) * H()) + 'px';
+  for (const { p, q, n } of springs) {
+    _d.subVectors(tp[q], tp[p]);
+    const d = Math.max(_d.length(), 1e-3);
+    const L = topics[p].r + topics[q].r + S * 7;
+    _d.multiplyScalar((d - L) * .02 * Math.min(4, 1 + Math.log2(n)) / d);
+    tv[p].add(_d); tv[q].sub(_d);
+  }
+  for (let i = 0; i < T; i++) {
+    tv[i].addScaledVector(tp[i], -.004);                         // gravity
+    tv[i].multiplyScalar(.6);
+    tp[i].addScaledVector(tv[i], Math.max(.08, cool));
   }
 }
+
+// ── Memory layout: golden spiral around each hub, in 3D ──────────────────────
+const final = new Float32Array(nodes.length * 3);
+const delay = new Float32Array(nodes.length);
+const _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p = new THREE.Vector3();
+
+// grow topics outward from the biggest one, breadth-first along their links
+const order = [];
+{
+  const seen = new Uint8Array(T), nbr = topics.map(() => []);
+  springs.forEach(({ p, q }) => { nbr[p].push(q); nbr[q].push(p); });
+  const bySize = topics.map((_, i) => i).sort((a, b) => topics[b].members.length - topics[a].members.length);
+  for (const s of bySize) {
+    if (seen[s]) continue;
+    const queue = [s]; seen[s] = 1;
+    while (queue.length) { const c = queue.shift(); order.push(c); nbr[c].forEach(n => { if (!seen[n]) { seen[n] = 1; queue.push(n); } }); }
+  }
+}
+const rankOf = new Float32Array(T);
+order.forEach((t, k) => { rankOf[t] = k / Math.max(1, T - 1); });
+
+topics.forEach((t, ti) => {
+  const c = tp[ti];
+  final.set([c.x, c.y, c.z], t.hub * 3);
+  delay[t.hub] = rankOf[ti] * 1.2;
+  const wToHub = id => (adj[id].find(e => e.n === t.hub) || { w: 0 }).w;
+  const rest = t.members.filter(id => id !== t.hub)
+    .sort((p, q) => wToHub(q) - wToHub(p) || adj[q].length - adj[p].length || p - q);
+  const n = rest.length;
+  _q.setFromEuler(_e.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI));
+  const flat = .55 + rng() * .35;                                // a little oblate, like a galaxy
+  rest.forEach((id, k) => {
+    const f = (k + .5) / Math.max(1, n);
+    const y = 1 - 2 * f, rr = Math.sqrt(1 - y * y), a = (k + 1) * GA;
+    const radius = t.r * (.12 + .88 * Math.pow(f, .62)) * (.86 + rng() * .28);   // dense core, sparse halo
+    _p.set(Math.cos(a) * rr * radius, y * radius * flat, Math.sin(a) * rr * radius).applyQuaternion(_q);
+    final.set([c.x + _p.x, c.y + _p.y, c.z + _p.z], id * 3);
+    delay[id] = rankOf[ti] * 1.2 + .1 + .5 * f;
+  });
+});
+
+// ── Colors & sizes ───────────────────────────────────────────────────────────
+const col = new Float32Array(nodes.length * 3);
+const size = new Float32Array(nodes.length);
+topics.forEach((t, ti) => {
+  const L = LAYERS[t.layer];
+  const drift = (((ti * 0.6180339887) % 1) - .5) * 40;          // hue drift per topic
+  t.members.forEach(id => {
+    const hub = id === t.hub;
+    const c = new THREE.Color().setHSL(
+      ((L.hue + drift + (rng() - .5) * 10) % 360 + 360) % 360 / 360,
+      L.sat, Math.min(.86, L.lit + (hub ? .16 : (rng() - .5) * .12)));
+    col.set([c.r, c.g, c.b], id * 3);
+    size[id] = hub ? 3.8 + Math.min(t.members.length, 200) * .008 : 2.4 + rng() * .6;
+  });
+});
 
 // ── Three.js core ────────────────────────────────────────────────────────────
 const canvas = document.getElementById('c');
 const W = () => window.innerWidth, H = () => window.innerHeight;
-
-const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(W(), H());
-renderer.toneMapping = THREE.ReinhardToneMapping;
-renderer.toneMappingExposure = 1.0;
-renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setClearColor(0x000000, 0);
+const DPR = renderer.getPixelRatio();
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x000000);
-scene.fog = new THREE.FogExp2(0x000000, 0.00025);
-
-const camera = new THREE.PerspectiveCamera(58, W()/H(), 0.5, 3000);
-camera.position.set(0, 150, 640);
-camera.lookAt(0, 60, 0);
-
+const graph = new THREE.Group();
+scene.add(graph);
+const camera = new THREE.PerspectiveCamera(40, W() / H(), 1, 50000);
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
-controls.dampingFactor = 0.045;
-controls.minDistance = 60;
-controls.maxDistance = 1400;
-controls.target.set(0, 60, 0);
-controls.autoRotate = true;
-controls.autoRotateSpeed = 0.18;
+controls.dampingFactor = 0.06;
+controls.screenSpacePanning = true;
+controls.rotateSpeed = 0.6;
+controls.autoRotate = false;
+controls.autoRotateSpeed = 0.35;
 
-// ── Post-processing ──────────────────────────────────────────────────────────
-const composer = new EffectComposer(renderer);
-composer.addPass(new RenderPass(scene, camera));
-// strength ↓, radius ↓, threshold ↑ → tight glow, crisp dot centers (no haze)
-const bloom = new UnrealBloomPass(new THREE.Vector2(W(), H()), 0.45, 0.18, 0.25);
-composer.addPass(bloom);
-composer.addPass(new OutputPass());
+function applyViewOffset() {
+  if (W() > 640) camera.setViewOffset(W(), H(), 150, 0, W(), H());
+  else camera.clearViewOffset();
+}
+applyViewOffset();
+const pxScale = () => H() * DPR / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
 
-// ── Lighting ─────────────────────────────────────────────────────────────────
-scene.add(new THREE.AmbientLight(0x0a0a2a, 8));
-LAYER_ORDER.forEach(layer => {
-  const pl = new THREE.PointLight(LAYERS[layer].c, 25, 220);
-  pl.position.copy(clusterCenter[layer]);
-  scene.add(pl);
-});
-
-// ── Background: solid black (nebula starfield removed) ────────────────────────
-
-// ── Floor grid removed ────────────────────────────────────────────────────────
-
-// ── Center orb removed (core sphere, atmosphere, orbital ring & spokes) ───────
-
-// ── Node points cloud (sprite dots, colored by memory layer) ──────────────────
-const N_NODES  = nodes.length;
-const nPos     = new Float32Array(N_NODES*3);
-const nCol     = new Float32Array(N_NODES*3);
-const nSize    = new Float32Array(N_NODES);  // live size (hover-animated)
-const nBright  = new Float32Array(N_NODES);  // brightness multiplier
-const baseSize = new Float32Array(N_NODES);  // resting size
-
-nodes.forEach((n,i) => {
-  nPos[i*3]=n.position.x; nPos[i*3+1]=n.position.y; nPos[i*3+2]=n.position.z;
-  nCol[i*3]=n.color.r;    nCol[i*3+1]=n.color.g;    nCol[i*3+2]=n.color.b;
-  baseSize[i] = 15 + Math.min(n.deg,10) * 1.8;
-  nSize[i]    = baseSize[i];
-  nBright[i]  = 1.0;
-});
-
-// Physics state: home anchors + velocities for draggable, springy layout
-const hPos = nPos.slice();
-const vel  = new Float32Array(N_NODES*3);
-
+// Points: a crisp core plus a faint halo, blended additively, so dense topic
+// cores glow on their own.
+const pos = new Float32Array(nodes.length * 3);
+const alpha = new Float32Array(nodes.length).fill(1);
 const nodeGeo = new THREE.BufferGeometry();
-nodeGeo.setAttribute('position', new THREE.BufferAttribute(nPos,3));
-nodeGeo.setAttribute('aColor',   new THREE.BufferAttribute(nCol,3));
-const sizeAttr   = new THREE.BufferAttribute(nSize,1);   sizeAttr.setUsage(THREE.DynamicDrawUsage);
-const brightAttr = new THREE.BufferAttribute(nBright,1); brightAttr.setUsage(THREE.DynamicDrawUsage);
-nodeGeo.setAttribute('aSize',   sizeAttr);
-nodeGeo.setAttribute('aBright', brightAttr);
-
+nodeGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+nodeGeo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+nodeGeo.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
+nodeGeo.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1).setUsage(THREE.DynamicDrawUsage));
 const nodeMat = new THREE.ShaderMaterial({
-  uniforms: { uDpr: { value: renderer.getPixelRatio() } },
-  vertexShader:`
-    uniform float uDpr;
-    attribute vec3  aColor;
-    attribute float aSize;
-    attribute float aBright;
-    varying vec3 vCol; varying float vBright;
+  uniforms: { uPx: { value: pxScale() }, uDpr: { value: DPR } },
+  vertexShader: `
+    uniform float uPx; uniform float uDpr;
+    attribute vec3 aColor; attribute float aSize; attribute float aAlpha;
+    varying vec3 vCol; varying float vA; varying float vCore;
     void main(){
-      vCol = aColor; vBright = aBright;
+      vCol = aColor; vA = aAlpha;
       vec4 mv = modelViewMatrix * vec4(position, 1.0);
-      gl_PointSize = min(aSize * uDpr * (340.0 / -mv.z), 90.0);
-      gl_Position  = projectionMatrix * mv;
-    }
-  `,
-  fragmentShader:`
-    varying vec3 vCol; varying float vBright;
+      float core = clamp(aSize * uPx / -mv.z, 1.4 * uDpr, 9.0 * uDpr);
+      gl_PointSize = core * 3.0;              // room for the halo
+      vCore = 1.0 / 3.0;
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    varying vec3 vCol; varying float vA; varying float vCore;
     void main(){
-      float d = length(gl_PointCoord - vec2(0.5));
-      if (d > 0.5) discard;                       // circular sprite
-      float core = smoothstep(0.5, 0.12, d);      // soft edge
-      gl_FragColor = vec4(vCol * vBright, core);
-    }
-  `,
-  transparent:true, depthWrite:false, blending:THREE.NormalBlending,
+      float d = length(gl_PointCoord - 0.5) * 2.0;
+      if (d > 1.0) discard;
+      float core = 1.0 - smoothstep(vCore * 0.78, vCore, d);
+      float halo = exp(-d * d * 7.0) * 0.16;
+      gl_FragColor = vec4(vCol, (core * 0.9 + halo) * vA);
+    }`,
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
 });
 const nodePoints = new THREE.Points(nodeGeo, nodeMat);
-scene.add(nodePoints);
+nodePoints.renderOrder = 1;
+graph.add(nodePoints);
 
-// ── Connection LineSegments with flow shader ───────────────────────────────────
-const E = edges.length;
-const lPos  = new Float32Array(E*6);
-const lProg = new Float32Array(E*2);
-const lPhase= new Float32Array(E*2);
-const lColA = new Float32Array(E*6); // source color
-const lColB = new Float32Array(E*6); // target color (for gradient)
-const lHL   = new Float32Array(E*2); // highlight flag
-
-edges.forEach((e,i) => {
-  const a=nodes[e.s].position, b=nodes[e.t].position;
-  e.rest = a.distanceTo(b); // spring rest length = initial layout distance
-  lPos[i*6+0]=a.x;lPos[i*6+1]=a.y;lPos[i*6+2]=a.z;
-  lPos[i*6+3]=b.x;lPos[i*6+4]=b.y;lPos[i*6+5]=b.z;
-  lProg[i*2]=0.0; lProg[i*2+1]=1.0;
-  const ph=rng(); lPhase[i*2]=ph; lPhase[i*2+1]=ph;
-  const ca=nodes[e.s].color, cb=nodes[e.t].color;
-  lColA[i*6+0]=ca.r;lColA[i*6+1]=ca.g;lColA[i*6+2]=ca.b;
-  lColA[i*6+3]=ca.r;lColA[i*6+4]=ca.g;lColA[i*6+5]=ca.b;
-  lColB[i*6+0]=cb.r;lColB[i*6+1]=cb.g;lColB[i*6+2]=cb.b;
-  lColB[i*6+3]=cb.r;lColB[i*6+4]=cb.g;lColB[i*6+5]=cb.b;
-  lHL[i*2]=0; lHL[i*2+1]=0;
+// Lines: hub→member spokes (the starburst) plus similarity links, hairline.
+const links = [];
+topics.forEach(t => t.members.forEach(id => { if (id !== t.hub) links.push({ a: t.hub, b: id, k: .045 }); }));
+edges.forEach(e => links.push({ a: e.a, b: e.b, k: topicOf[e.a] === topicOf[e.b] ? .045 : .03 }));
+const lPos = new Float32Array(links.length * 6);
+const lCol = new Float32Array(links.length * 6);
+const lA = new Float32Array(links.length * 2);
+links.forEach((l, i) => {
+  lCol.set([col[l.a*3], col[l.a*3+1], col[l.a*3+2], col[l.b*3], col[l.b*3+1], col[l.b*3+2]], i * 6);
+  lA[i*2] = lA[i*2+1] = l.k;
 });
-
 const lineGeo = new THREE.BufferGeometry();
-lineGeo.setAttribute('position', new THREE.BufferAttribute(lPos,3));
-lineGeo.setAttribute('aProgress',new THREE.BufferAttribute(lProg,1));
-lineGeo.setAttribute('aPhase',   new THREE.BufferAttribute(lPhase,1));
-lineGeo.setAttribute('aColA',    new THREE.BufferAttribute(lColA,3));
-lineGeo.setAttribute('aColB',    new THREE.BufferAttribute(lColB,3));
-const hlAttr = new THREE.BufferAttribute(lHL,1);
-hlAttr.setUsage(THREE.DynamicDrawUsage);
-lineGeo.setAttribute('aHL', hlAttr);
+lineGeo.setAttribute('position', new THREE.BufferAttribute(lPos, 3).setUsage(THREE.DynamicDrawUsage));
+lineGeo.setAttribute('aColor', new THREE.BufferAttribute(lCol, 3));
+lineGeo.setAttribute('aAlpha', new THREE.BufferAttribute(lA, 1).setUsage(THREE.DynamicDrawUsage));
+graph.add(new THREE.LineSegments(lineGeo, new THREE.ShaderMaterial({
+  uniforms: { uBoost: { value: Math.min(2, DPR) } },
+  vertexShader: `
+    attribute vec3 aColor; attribute float aAlpha; varying vec3 vC; varying float vA;
+    void main(){ vC = aColor; vA = aAlpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `uniform float uBoost; varying vec3 vC; varying float vA; void main(){ gl_FragColor = vec4(vC, vA * uBoost); }`,
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+})));
 
-const lineUniforms = { uTime:{ value:0 } };
-const lineSeg = new THREE.LineSegments(lineGeo, new THREE.ShaderMaterial({
-  uniforms: lineUniforms,
-  vertexShader:`
-    attribute float aProgress;
-    attribute float aPhase;
-    attribute vec3  aColA;
-    attribute vec3  aColB;
-    attribute float aHL;
-    varying float vP; varying float vPh; varying vec3 vCA; varying vec3 vCB; varying float vHL;
-    void main(){
-      vP=aProgress; vPh=aPhase; vCA=aColA; vCB=aColB; vHL=aHL;
-      gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);
-    }
-  `,
-  fragmentShader:`
-    uniform float uTime;
-    varying float vP; varying float vPh; varying vec3 vCA; varying vec3 vCB; varying float vHL;
-    void main(){
-      // Color gradient along edge
-      vec3 col = mix(vCA, vCB, vP);
-      // Flow pulse
-      float flow = fract(vP*2.8 - uTime*.42 + vPh);
-      float pulse= smoothstep(0.,.11,flow)*smoothstep(.28,.11,flow);
-      float base = .012 + vHL*.34;
-      float alpha= base + pulse*(.10 + vHL*.80);
-      vec3 bright= col + pulse*(.35 + vHL*.7) + vHL*.25;
-      gl_FragColor = vec4(bright, alpha);
-    }
-  `,
-  transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
-}));
-scene.add(lineSeg);
+// Hover: white links + a ring on the focused point
+const maxDeg = Math.max(1, ...adj.map(a => a.length));
+const hlPos = new Float32Array((maxDeg + 1) * 6);
+const hlGeo = new THREE.BufferGeometry();
+hlGeo.setAttribute('position', new THREE.BufferAttribute(hlPos, 3).setUsage(THREE.DynamicDrawUsage));
+hlGeo.setDrawRange(0, 0);
+const hlLines = new THREE.LineSegments(hlGeo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .9, depthTest: false }));
+hlLines.renderOrder = 2;
+graph.add(hlLines);
 
-// ── Hover ──────────────────────────────────────────────────────────────────────
-const raycaster = new THREE.Raycaster();
-raycaster.params.Points.threshold = 9; // world-space picking radius for dots
-const pointer   = new THREE.Vector2(-9,-9);
-let hovId = -1;
-const neighborSet = new Set();
+const ringGeo = new THREE.BufferGeometry();
+ringGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3));
+const ringMat = new THREE.ShaderMaterial({
+  uniforms: { uPx: nodeMat.uniforms.uPx, uDpr: nodeMat.uniforms.uDpr, uSize: { value: 4 } },
+  vertexShader: `
+    uniform float uPx; uniform float uDpr; uniform float uSize;
+    void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0);
+      gl_PointSize = clamp(uSize * uPx / -mv.z, 13.0 * uDpr, 26.0 * uDpr); gl_Position = projectionMatrix * mv; }`,
+  fragmentShader: `
+    void main(){ float d = length(gl_PointCoord - 0.5) * 2.0;
+      float ring = smoothstep(0.62, 0.72, d) * (1.0 - smoothstep(0.84, 0.94, d));
+      if (ring < 0.01) discard; gl_FragColor = vec4(1.0, 1.0, 1.0, ring); }`,
+  transparent: true, depthTest: false,
+});
+const ring = new THREE.Points(ringGeo, ringMat);
+ring.visible = false; ring.renderOrder = 3;
+graph.add(ring);
 
-// Recompute every dot's size + brightness from the current hover (focus-dim)
-function applyNodeState() {
-  for (let i = 0; i < N_NODES; i++) {
-    let b, s;
-    if (hovId === -1)            { b = 1.00; s = baseSize[i]; }
-    else if (i === hovId)        { b = 1.70; s = baseSize[i] * 2.1; }
-    else if (neighborSet.has(i)) { b = 1.15; s = baseSize[i] * 1.25; }
-    else                         { b = 0.16; s = baseSize[i] * 0.8; }
-    nBright[i] = b; nSize[i] = s;
+// ── Positions (intro: topics bloom out from their hubs in turn) ──────────────
+const ease = t => 1 - Math.pow(1 - t, 3);
+const INTRO = 2.6;                                               // seconds
+let introT = STATIC ? 99 : 0;
+const grow = new Float32Array(nodes.length);
+function writePositions() {
+  for (let i = 0; i < nodes.length; i++) {
+    const t = ease(Math.min(1, Math.max(0, (introT - delay[i]) / .7)));
+    grow[i] = t;
+    const h = topics[topicOf[i]].hub;
+    for (let k = 0; k < 3; k++) pos[i*3+k] = final[h*3+k] + (final[i*3+k] - final[h*3+k]) * t;
+    alpha[i] = (active === 'All' || nodes[i].layer === active ? 1 : .04) * Math.min(1, t * 1.5 + (isHub[i] && introT > delay[i] ? 1 : 0));
   }
-  brightAttr.needsUpdate = true;
-  sizeAttr.needsUpdate   = true;
+  nodeGeo.attributes.position.needsUpdate = true;
+  nodeGeo.attributes.aAlpha.needsUpdate = true;
+  links.forEach((l, i) => {
+    lPos[i*6]   = pos[l.a*3]; lPos[i*6+1] = pos[l.a*3+1]; lPos[i*6+2] = pos[l.a*3+2];
+    lPos[i*6+3] = pos[l.b*3]; lPos[i*6+4] = pos[l.b*3+1]; lPos[i*6+5] = pos[l.b*3+2];
+  });
+  lineGeo.attributes.position.needsUpdate = true;
 }
 
+// ── Camera framing ───────────────────────────────────────────────────────────
+let fly = null;
+function fitSphere(ids) {
+  const box = new THREE.Box3(), v = new THREE.Vector3();
+  graph.updateMatrixWorld();
+  ids.forEach(i => box.expandByPoint(v.set(final[i*3], final[i*3+1], final[i*3+2]).applyMatrix4(graph.matrixWorld)));
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  const fov = THREE.MathUtils.degToRad(camera.fov);
+  const fit = Math.min(fov, 2 * Math.atan(Math.tan(fov / 2) * camera.aspect));
+  return { center: sphere.center, dist: Math.max(sphere.radius, 30) / Math.sin(fit / 2) * 1.02 };
+}
+function frame(ids, instant) {
+  const { center, dist } = fitSphere(ids);
+  const dir = camera.position.clone().sub(controls.target);
+  if (dir.lengthSq() < 1e-6) dir.set(0, .15, 1);
+  dir.normalize();
+  const toP = center.clone().addScaledVector(dir, dist);
+  controls.maxDistance = dist * 4;
+  if (instant || REDUCED) { camera.position.copy(toP); controls.target.copy(center); controls.update(); fly = null; }
+  else fly = { t: 0, fromP: camera.position.clone(), toP, fromT: controls.target.clone(), toT: center.clone() };
+}
+
+// ── Panel ────────────────────────────────────────────────────────────────────
+let active = 'All';
+const layersEl = document.getElementById('layers');
+const cnum = document.getElementById('cnum');
+document.getElementById('total').textContent = nodes.length.toLocaleString();
+const rows = {};
+function addRow(name, count, accent) {
+  const b = document.createElement('button');
+  b.className = 'row'; b.setAttribute('role', 'tab'); b.style.setProperty('--accent', accent);
+  b.innerHTML = '<span class="l"></span><span class="c"></span>';
+  b.querySelector('.l').textContent = name;
+  b.querySelector('.c').textContent = count.toLocaleString();
+  b.addEventListener('click', () => select(name));
+  layersEl.appendChild(b); rows[name] = b;
+}
+addRow('All', nodes.length, '#e8eaee');
+ORDER.forEach(l => byLayer[l] && addRow(l, byLayer[l].length, layerCss(l)));
+
+function select(name, instant) {
+  active = name;
+  Object.entries(rows).forEach(([k, b]) => { b.classList.toggle('on', k === name); b.setAttribute('aria-selected', k === name); });
+  const ids = name === 'All' ? nodes.map(n => n.id) : byLayer[name];
+  cnum.textContent = ids.length.toLocaleString();
+  document.getElementById('count').style.setProperty('--accent', name === 'All' ? '#e8eaee' : layerCss(name));
+  links.forEach((l, i) => {
+    const on = name === 'All' || (nodes[l.a].layer === name && nodes[l.b].layer === name);
+    lA[i*2] = lA[i*2+1] = on ? l.k : l.k * .05;
+  });
+  lineGeo.attributes.aAlpha.needsUpdate = true;
+  setHover(-1);
+  writePositions();
+  frame(ids, instant);
+}
+document.getElementById('reset').addEventListener('click', () => select('All'));
+
+// ── Hover (screen-space picking) ─────────────────────────────────────────────
+const tip = document.getElementById('tip');
+let hov = -1, mouse = null;
+const _v = new THREE.Vector3();
+function pickAt(mx, my) {
+  let best = -1, bestD = Infinity;
+  const px = pxScale() / DPR;
+  graph.updateMatrixWorld();
+  for (let i = 0; i < nodes.length; i++) {
+    if (alpha[i] < .5) continue;
+    _v.set(pos[i*3], pos[i*3+1], pos[i*3+2]).applyMatrix4(graph.matrixWorld).applyMatrix4(camera.matrixWorldInverse);
+    if (_v.z > -1) continue;
+    const rpx = Math.max(6, size[i] * px / -_v.z);
+    _v.applyMatrix4(camera.projectionMatrix);
+    const sx = (_v.x * .5 + .5) * W(), sy = (-_v.y * .5 + .5) * H();
+    const d = Math.hypot(sx - mx, sy - my);
+    if (d < rpx && d < bestD) { best = i; bestD = d; }
+  }
+  return best;
+}
 function setHover(id) {
-  if (id === hovId) return;
-
-  // Clear previous edge highlights
-  if (hovId !== -1) adj[hovId].forEach(({edge:ei}) => { lHL[ei*2]=0; lHL[ei*2+1]=0; });
-
-  hovId = id;
-  neighborSet.clear();
-
-  if (id !== -1) {
-    adj[id].forEach(({node:nb, edge:ei}) => {
-      neighborSet.add(nb);
-      lHL[ei*2]=1; lHL[ei*2+1]=1;
-    });
-    controls.autoRotate = false;
-    canvas.style.cursor = 'pointer';
-  } else {
-    canvas.style.cursor = 'grab';
-  }
-
-  hlAttr.needsUpdate = true;
-  applyNodeState();
-  syncAuxUI(id);
+  if (id === hov) return;
+  hov = id;
+  if (id === -1) { hlGeo.setDrawRange(0, 0); ring.visible = false; tip.classList.remove('on'); return; }
+  let k = 0;
+  const seg = (a, b) => { hlPos.set([pos[a*3], pos[a*3+1], pos[a*3+2], pos[b*3], pos[b*3+1], pos[b*3+2]], k * 6); k++; };
+  const hub = topics[topicOf[id]].hub;
+  if (hub !== id) seg(id, hub);
+  adj[id].forEach(({ n }) => { if (n !== hub && (k + 1) * 6 <= hlPos.length) seg(id, n); });
+  hlGeo.attributes.position.needsUpdate = true;
+  hlGeo.setDrawRange(0, k * 2);
+  ringGeo.attributes.position.array.set([pos[id*3], pos[id*3+1], pos[id*3+2]]);
+  ringGeo.attributes.position.needsUpdate = true;
+  ringMat.uniforms.uSize.value = size[id] * 2.4;
+  ring.visible = true;
+  const nl = adj[id].length;
+  tip.querySelector('.k').textContent = nodes[id].layer + (isHub[id] ? ' · topic hub' : '') + (nl ? ` · ${nl} link${nl === 1 ? '' : 's'}` : '');
+  tip.querySelector('.v').textContent = nodes[id].label;
+  tip.classList.add('on');
+  controls.autoRotate = false;
 }
-
-canvas.addEventListener('pointermove', ev => {
-  hoverLock = false; // pointer is back on the canvas — resume raycast hover
-  pointer.set(
-    (ev.clientX/W())*2-1,
-    -(ev.clientY/H())*2+1
-  );
-  if (dragId !== -1) {
-    raycaster.setFromCamera(pointer, camera);
-    if (raycaster.ray.intersectPlane(dragPlane, dragPoint)) {
-      nodes[dragId].position.copy(dragPoint);
-      vel[dragId*3] = vel[dragId*3+1] = vel[dragId*3+2] = 0;
-    }
-  }
-});
-canvas.addEventListener('pointerleave', () => setHover(-1));
-
-// ── Draggable nodes (live spring physics) ────────────────────────────────────
-let dragId = -1;
-const dragPlane = new THREE.Plane();
-const dragPoint = new THREE.Vector3();
-const _camDir   = new THREE.Vector3();
-const K_HOME = 0.010, K_EDGE = 0.025, DAMP = 0.82;
-
-canvas.addEventListener('pointerdown', ev => {
-  pointer.set((ev.clientX/W())*2-1, -(ev.clientY/H())*2+1);
-  raycaster.setFromCamera(pointer, camera);
-  const hits = raycaster.intersectObject(nodePoints);
-  if (hits.length) {
-    dragId = hits[0].index;
-    controls.enabled = false; // don't orbit while dragging a node
-    camera.getWorldDirection(_camDir);
-    dragPlane.setFromNormalAndCoplanarPoint(_camDir, nodes[dragId].position);
-    canvas.style.cursor = 'grabbing';
-  }
-});
-window.addEventListener('pointerup', () => {
-  if (dragId !== -1) { dragId = -1; controls.enabled = true; canvas.style.cursor = 'grab'; }
-});
-
-// One spring step: drag pulls neighbors along edges; home anchors ease it back
-function physics() {
-  for (const e of edges) {
-    const a = nodes[e.s].position, b = nodes[e.t].position;
-    let dx=b.x-a.x, dy=b.y-a.y, dz=b.z-a.z;
-    const d = Math.hypot(dx,dy,dz) || 0.001;
-    const f = (d - e.rest) * K_EDGE / d;
-    dx*=f; dy*=f; dz*=f;
-    if (e.s !== dragId) { vel[e.s*3]+=dx; vel[e.s*3+1]+=dy; vel[e.s*3+2]+=dz; }
-    if (e.t !== dragId) { vel[e.t*3]-=dx; vel[e.t*3+1]-=dy; vel[e.t*3+2]-=dz; }
-  }
-  for (let i=0;i<N_NODES;i++){
-    if (i === dragId) continue;
-    const p = nodes[i].position;
-    vel[i*3]   += (hPos[i*3]  -p.x)*K_HOME;
-    vel[i*3+1] += (hPos[i*3+1]-p.y)*K_HOME;
-    vel[i*3+2] += (hPos[i*3+2]-p.z)*K_HOME;
-    vel[i*3]*=DAMP; vel[i*3+1]*=DAMP; vel[i*3+2]*=DAMP;
-    p.x+=vel[i*3]; p.y+=vel[i*3+1]; p.z+=vel[i*3+2];
-  }
-  // push updated positions into the GPU buffers
-  const pa = nodeGeo.getAttribute('position');
-  for (let i=0;i<N_NODES;i++){ pa.array[i*3]=nodes[i].position.x; pa.array[i*3+1]=nodes[i].position.y; pa.array[i*3+2]=nodes[i].position.z; }
-  pa.needsUpdate = true;
-  for (let i=0;i<edges.length;i++){
-    const a=nodes[edges[i].s].position, b=nodes[edges[i].t].position;
-    lPos[i*6]=a.x;lPos[i*6+1]=a.y;lPos[i*6+2]=a.z;
-    lPos[i*6+3]=b.x;lPos[i*6+4]=b.y;lPos[i*6+5]=b.z;
-  }
-  lineGeo.getAttribute('position').needsUpdate = true;
+function placeTip() {
+  if (!mouse || hov === -1) return;
+  const r = tip.getBoundingClientRect();
+  let x = mouse.x + 16, y = mouse.y + 16;
+  if (x + r.width > W() - 12) x = mouse.x - r.width - 16;
+  if (y + r.height > H() - 12) y = mouse.y - r.height - 16;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
 }
-
-// ── Auto-rotate on idle ────────────────────────────────────────────────────────
-let idleTimer = null;
-function resetIdle(){
+let dragging = false, idleTimer = null;
+function idle() {
+  controls.autoRotate = false;
   clearTimeout(idleTimer);
-  controls.autoRotate=false;
-  idleTimer=setTimeout(()=>{ if(hovId===-1) controls.autoRotate=true; },4000);
+  if (!STATIC) idleTimer = setTimeout(() => { if (hov === -1) controls.autoRotate = true; }, 6000);
 }
-canvas.addEventListener('pointerdown', resetIdle);
-canvas.addEventListener('wheel',       resetIdle);
+canvas.addEventListener('pointerdown', () => { dragging = true; fly = null; idle(); });
+window.addEventListener('pointerup', () => { dragging = false; });
+canvas.addEventListener('pointermove', e => { mouse = { x: e.clientX, y: e.clientY }; });
+canvas.addEventListener('pointerleave', () => { mouse = null; setHover(-1); });
+canvas.addEventListener('wheel', () => { fly = null; idle(); }, { passive: true });
 
-// ── Clock & animation loop ────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = W() / H(); applyViewOffset(); camera.updateProjectionMatrix();
+  renderer.setSize(W(), H());
+  nodeMat.uniforms.uPx.value = pxScale();
+});
+
+// ── Start: frame everything, then swing up from a low angle while it grows ───
+writePositions();
+{
+  const { center, dist } = fitSphere(nodes.map(n => n.id));
+  controls.target.copy(center);
+  const end = new THREE.Spherical(dist, Math.PI * .44, 0);
+  const start = new THREE.Spherical(dist * 1.15, Math.PI * .5 - .05, -.9);
+  const s = STATIC ? end : start;
+  camera.position.setFromSpherical(s).add(center);
+  controls.update();
+  if (!STATIC) fly = { t: 0, dur: INTRO + .6, sph: [start, end], center };
+  controls.maxDistance = dist * 4;
+}
+select('All', true);
+requestAnimationFrame(() => document.body.classList.add('ready'));
+
 const clock = new THREE.Clock();
-
+let introStart = null;
 function tick() {
   requestAnimationFrame(tick);
-  const t = clock.getElapsedTime();
-
-  // Update shader uniforms
-  lineUniforms.uTime.value  = t;
-
-  // Hover raycaster (skipped while the list drives the hover)
-  if (!hoverLock) {
-    raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObject(nodePoints);
-    setHover(hits.length ? hits[0].index : -1);
+  const dt = Math.min(clock.getDelta(), .05);
+  if (introT < INTRO + 1) {
+    if (introStart === null) introStart = performance.now();
+    introT = (performance.now() - introStart) / 1000;
+    writePositions();
+    if (introT >= INTRO + 1 && !STATIC) controls.autoRotate = true;
   }
-
-  // Gently recenter the orbit on a list-focused node
-  if (focusTarget) {
-    controls.target.lerp(focusTarget, 0.08);
-    if (controls.target.distanceTo(focusTarget) < 0.5) focusTarget = null;
+  if (fly) {
+    fly.t = Math.min(1, fly.t + dt / (fly.dur || .9));
+    const e = ease(fly.t);
+    if (fly.sph) {
+      const [a, b] = fly.sph;
+      const s = new THREE.Spherical(a.radius + (b.radius - a.radius) * e, a.phi + (b.phi - a.phi) * e, a.theta + (b.theta - a.theta) * e);
+      camera.position.setFromSpherical(s).add(fly.center);
+    } else {
+      camera.position.lerpVectors(fly.fromP, fly.toP, e);
+      controls.target.lerpVectors(fly.fromT, fly.toT, e);
+    }
+    if (fly.t >= 1) fly = null;
   }
-
-  physics();
-  positionLabels();
-
   controls.update();
-  composer.render();
+  if (!dragging && mouse) setHover(pickAt(mouse.x, mouse.y));
+  else if (dragging && hov !== -1) setHover(-1);
+  placeTip();
+  renderer.render(scene, camera);
 }
 tick();
-
-// ── Resize ────────────────────────────────────────────────────────────────────
-window.addEventListener('resize', () => {
-  camera.aspect = W()/H();
-  camera.updateProjectionMatrix();
-  renderer.setSize(W(), H());
-  composer.setSize(W(), H());
-  bloom.resolution.set(W(), H());
-});
-
-// ── Dismiss loading screen ────────────────────────────────────────────────────
-setTimeout(() => {
-  const l = document.getElementById('loading');
-  l.style.opacity='0';
-  setTimeout(()=>l.remove(), 900);
-}, 1600);
-
 </script>
 </body>
 </html>
