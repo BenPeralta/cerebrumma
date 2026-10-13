@@ -1,6 +1,10 @@
 #!/bin/sh
 # Cerebrumma Installer
 # Usage: curl -fsSL https://get.cerebrumma.com | sh
+#        curl -fsSL https://get.cerebrumma.com | sh -s -- --mcp-only
+#
+# --mcp-only skips the CLI (e.g. when Homebrew already installed it) and only
+# sets up the MCP server, Claude Code config and global Brain.
 #
 # Downloads a prebuilt `cerebrum` binary for your platform (fast, no compiler).
 # Falls back to building from source if no prebuilt binary matches.
@@ -11,6 +15,13 @@ OWNER="BenPeralta/cerebrumma"
 CLAUDE_JSON="$HOME/.claude.json"
 BIN_DIR="$HOME/.local/bin"
 STAR_MARKER="$HOME/.cerebrumma/.star-prompted"
+
+MCP_ONLY=""
+for arg in "$@"; do
+  case "$arg" in
+    --mcp-only) MCP_ONLY=1 ;;
+  esac
+done
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -114,7 +125,19 @@ install_prebuilt() {
   return 0
 }
 
-if [ -n "$TARGET" ] && install_prebuilt; then
+# A Homebrew-managed cerebrum is left alone; a second copy in ~/.local/bin
+# would shadow `brew upgrade`.
+EXISTING=$(command -v cerebrum 2>/dev/null || true)
+if [ -n "$EXISTING" ]; then
+  RESOLVED=$(readlink "$EXISTING" 2>/dev/null || echo "$EXISTING")
+  case "$EXISTING:$RESOLVED" in
+    */Cellar/*|*/homebrew/*|*/linuxbrew/*) MCP_ONLY=1 ;;
+  esac
+fi
+
+if [ -n "$MCP_ONLY" ] && command -v cerebrum >/dev/null 2>&1; then
+  ok "Using existing cerebrum → $(command -v cerebrum)"
+elif [ -n "$TARGET" ] && install_prebuilt; then
   :
 else
   build_from_source
@@ -149,19 +172,28 @@ if [ -n "$MCP_SRC" ] && [ -d "$MCP_SRC" ]; then
   mkdir -p "$HOME/.cerebrumma"
   rm -rf "$MCP_DEST"
   cp -r "$MCP_SRC" "$MCP_DEST"
-  uv pip install --quiet -e "$MCP_DEST" 2>/dev/null \
-    || uv pip install --system --quiet -e "$MCP_DEST" 2>/dev/null \
-    || warn "MCP server install skipped — run: uv pip install -e ~/.cerebrumma/mcp_server"
-  ok "MCP server installed → $MCP_DEST"
+  # Build the project's own venv now, so the first `uv run` from Claude Code
+  # starts instantly instead of resolving dependencies mid-handshake.
+  if uv sync --quiet --project "$MCP_DEST" 2>/dev/null; then
+    ok "MCP server installed → $MCP_DEST"
+  else
+    warn "MCP server dependencies not prepared — they will install on first run"
+  fi
 else
   warn "MCP server source not found — skipping (CLI still works)"
 fi
 
 # ── 4. Configure Claude Code (optional) ──────────────────────────────────────
 configure_claude() {
+  # Write the launcher first so the manual hint below points at a real file.
+  WRAPPER="$HOME/.cerebrumma/run-mcp.sh"
+  UV_BIN=$(command -v uv || echo "$HOME/.local/bin/uv")
+  printf '#!/bin/sh\n%s run --project %s cerebrumma-mcp\n' "$UV_BIN" "$MCP_DEST" > "$WRAPPER"
+  chmod +x "$WRAPPER"
+
   if ! command -v claude >/dev/null 2>&1; then
     warn "Claude Code CLI not found — skipping MCP auto-config"
-    warn "After installing Claude Code, run: claude mcp add cerebrumma -s user $MCP_DEST/run-mcp.sh"
+    warn "After installing Claude Code, run: claude mcp add cerebrumma -s user $WRAPPER"
     return
   fi
 
@@ -169,11 +201,6 @@ configure_claude() {
     ok "Claude Code already configured"
     return
   fi
-
-  WRAPPER="$HOME/.cerebrumma/run-mcp.sh"
-  UV_BIN=$(command -v uv || echo "$HOME/.local/bin/uv")
-  printf '#!/bin/sh\n%s run --project %s cerebrumma-mcp\n' "$UV_BIN" "$MCP_DEST" > "$WRAPPER"
-  chmod +x "$WRAPPER"
 
   claude mcp add cerebrumma -s user "$WRAPPER"
   ok "Claude Code configured — restart Claude Code to load the Brain"
@@ -194,7 +221,7 @@ else
 fi
 
 # ── PATH hint ─────────────────────────────────────────────────────────────────
-case ":$PATH:" in
+[ -n "$MCP_ONLY" ] || case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
   *)
     warn "$BIN_DIR is not on your PATH."

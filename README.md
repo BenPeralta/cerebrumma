@@ -33,7 +33,11 @@ Or with [Homebrew](https://brew.sh):
 brew install BenPeralta/cerebrumma/cerebrumma
 ```
 
-The tap installs the CLI only; run the one-liner above to also set up the MCP server and Claude Code integration.
+The tap installs the CLI only. To add the MCP server and Claude Code integration without installing a second copy of the binary:
+
+```sh
+curl -fsSL https://get.cerebrumma.com | sh -s -- --mcp-only
+```
 
 ## Quickstart
 
