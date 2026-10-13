@@ -55,7 +55,7 @@
 
 
 - [ ] `og-image.png` — 1200×630 social sharing image for cerebrumma.com
-- [ ] `get.cerebrumma.com` HTTPS — move redirect from name.com to Vercel redirect rule (currently HTTP-only)
+- [x] `get.cerebrumma.com` HTTPS — served by Vercel with a valid cert + HSTS; http redirects to https
 - [ ] `cerebrum prune` — interactive review and deletion of stale entries
 - [ ] `cerebrum export` — dump Brain to JSON/CSV for portability
 - [ ] Windows support — installer + CLI
