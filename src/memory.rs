@@ -136,8 +136,15 @@ pub fn init_brain(path: PathBuf) -> Result<()> {
 
     // ── 3. Auto-Hook (if local) ──────────────────────────────────────────────
     if path != global_brain_path() {
-        println!("   {} Installing git auto-capture hook...", "→".dimmed());
-        let _ = hook_install();
+        match hook_install() {
+            Ok(()) => println!("   {} Git auto-capture hook installed", "→".dimmed()),
+            Err(e) => println!(
+                "   {} Git hook skipped: {}\n     Run {} once it's resolved.",
+                "!".yellow(),
+                e.to_string().lines().next().unwrap_or_default(),
+                "cerebrum hook install".yellow()
+            ),
+        }
     }
 
     // ── 4. Auto-Audit (if local) ──────────────────────────────────────────────

@@ -159,7 +159,9 @@ pub fn run_why(query: &str) -> Result<()> {
 
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
-            let content = fs::read_to_string(entry.path())?;
+            let Ok(content) = fs::read_to_string(entry.path()) else {
+                continue;
+            };
 
             if content.to_lowercase().contains(&query.to_lowercase()) {
                 matches += 1;
@@ -180,6 +182,37 @@ pub fn run_why(query: &str) -> Result<()> {
 
     if matches == 0 {
         println!("   {} No matches found in long-term memory.", "→".dimmed());
+        let needle = query.to_lowercase();
+        let recent = fs::read_dir(brain.join("memory/episodic"))
+            .map(|dir| {
+                dir.filter_map(|entry| entry.ok())
+                    .filter(|entry| {
+                        fs::read_to_string(entry.path())
+                            .map(|text| text.to_lowercase().contains(&needle))
+                            .unwrap_or(false)
+                    })
+                    .count()
+            })
+            .unwrap_or(0);
+        if recent > 0 {
+            println!(
+                "   {} {} recent episodic {} it, but `why` only traces rules and facts\n     that a dream cycle has promoted. Run {} to promote them.",
+                "→".dimmed(),
+                recent,
+                if recent == 1 {
+                    "entry mentions"
+                } else {
+                    "entries mention"
+                },
+                "cerebrum dream".yellow()
+            );
+        } else {
+            println!(
+                "   {} Try {} for a fuzzy match across every layer.",
+                "→".dimmed(),
+                format!("cerebrum search \"{query}\"").yellow()
+            );
+        }
     }
 
     Ok(())

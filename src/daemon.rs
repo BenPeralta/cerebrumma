@@ -244,6 +244,10 @@ pub fn run_daemon_cmd(action: DaemonAction) -> Result<()> {
             println!("{} Logs available at .cerebrum/daemon.log", "→".dimmed());
         }
         DaemonAction::Stop => {
+            if !plist_path.exists() {
+                println!("{} No daemon running for {}.", "○".dimmed(), cwd.display());
+                return Ok(());
+            }
             println!("{} Stopping daemon {}...", "→".yellow(), label);
 
             let _ = std::process::Command::new("launchctl")

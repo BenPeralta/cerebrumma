@@ -9,8 +9,11 @@ const HOOK_SCRIPT: &str = r#"#!/bin/sh
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 HASH=$(git rev-parse --short HEAD 2>/dev/null)
 MSG=$(git log -1 --pretty=%B 2>/dev/null | head -3 | tr '\n' ' ')
-FILES=$(git diff-tree --no-commit-id -r --name-only HEAD 2>/dev/null | head -10 | tr '\n' ' ')
-STATS=$(git diff-tree --no-commit-id -r --stat HEAD 2>/dev/null | tail -1)
+ALL=$(git diff-tree --root --no-commit-id -r --name-only HEAD 2>/dev/null | grep -v "^\.cerebrum/")
+COUNT=$(printf '%s\n' "$ALL" | grep -c .)
+FILES=$(printf '%s\n' "$ALL" | head -5 | tr '\n' ' ')
+[ "$COUNT" -gt 5 ] && FILES="${FILES}(+$((COUNT - 5)) more) "
+STATS=$(git diff-tree --root --no-commit-id -r --stat HEAD 2>/dev/null | tail -1)
 cerebrum add "commit ${HASH} on ${BRANCH}: ${MSG}| files: ${FILES}| ${STATS}"
 "#;
 

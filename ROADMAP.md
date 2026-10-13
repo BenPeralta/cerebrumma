@@ -51,7 +51,7 @@
 
 ## Backlog
 
-- [ ] `cerebrum init` should auto-run `cerebrum hook install` — one command instead of two
+- [x] `cerebrum init` auto-installs the git hook and reports if it was skipped
 
 
 - [ ] `og-image.png` — 1200×630 social sharing image for cerebrumma.com

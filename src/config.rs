@@ -101,10 +101,16 @@ pub fn run_stats() -> Result<()> {
         .map(|d| d.count())
         .unwrap_or(0);
 
+    let label = if brain == global_brain_path() {
+        "global ~/.cerebrum/".to_string()
+    } else {
+        format!("local {}", brain.display())
+    };
     println!(
-        "\n{} {} Brain Health & Usage:",
+        "\n{} {} Brain Health & Usage {}",
         "🧠".bright_cyan(),
-        "Cerebrumma".bold()
+        "Cerebrumma".bold(),
+        format!("({label})").dimmed()
     );
 
     println!("\n  {} Layers", "📂".dimmed());
@@ -121,7 +127,11 @@ pub fn run_stats() -> Result<()> {
         episodes.to_string().bright_magenta()
     );
 
-    println!("\n  {} Intelligence Synthesis", "✨".dimmed());
+    println!(
+        "\n  {} Intelligence Synthesis {}",
+        "✨".dimmed(),
+        "(all projects)".dimmed()
+    );
     println!(
         "    Total Dreams:   {}",
         stats.total_dreams.to_string().bright_white()
