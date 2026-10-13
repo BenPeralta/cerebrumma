@@ -86,24 +86,86 @@ canvas:active{cursor:grabbing}
   font-size:11px;color:var(--faint);letter-spacing:.02em;padding:0 16px
 }
 
+
+/* memory list drawer */
+#listBtn{
+  all:unset;pointer-events:auto;cursor:pointer;margin-left:10px;display:inline-flex;align-items:center;gap:7px;
+  padding:6px 10px 6px 9px;border-radius:10px;font-size:12px;font-weight:600;color:rgba(226,232,240,.78);
+  background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  transition:background .18s,color .18s
+}
+#listBtn:hover,#listBtn[aria-expanded="true"]{background:rgba(255,255,255,.1);color:var(--ink)}
+#listBtn:focus-visible{outline:2px solid rgba(255,255,255,.4)}
+#listBtn kbd{font-family:var(--mono);font-size:10px;color:var(--faint);border:1px solid var(--line);border-radius:5px;padding:0 5px;line-height:16px}
+#drawer{
+  position:fixed;top:58px;left:18px;bottom:18px;width:344px;z-index:12;display:flex;flex-direction:column;overflow:hidden;
+  transform:translateX(calc(-100% - 24px));opacity:0;visibility:hidden;
+  transition:transform .32s cubic-bezier(.2,.8,.2,1),opacity .2s,visibility 0s linear .32s
+}
+#drawer.open{transform:none;opacity:1;visibility:visible;transition:transform .32s cubic-bezier(.2,.8,.2,1),opacity .2s}
+#dhead{padding:10px;border-bottom:1px solid var(--line)}
+#qwrap{display:flex;align-items:center;gap:8px;padding:0 10px;height:38px;border-radius:11px;background:rgba(255,255,255,.05);border:1px solid var(--line)}
+#qwrap:focus-within{border-color:rgba(255,255,255,.22);background:rgba(255,255,255,.07)}
+#qwrap svg{flex:none;color:var(--faint)}
+#q{all:unset;flex:1;min-width:0;font-size:13px;color:var(--ink)}
+#q::placeholder{color:var(--faint)}
+#q::-webkit-search-cancel-button{display:none}
+#qn{font-family:var(--mono);font-size:10.5px;color:var(--faint);white-space:nowrap}
+#dclose{all:unset;cursor:pointer;color:var(--faint);display:grid;place-items:center;width:22px;height:22px;border-radius:6px}
+#dclose:hover{color:var(--ink);background:rgba(255,255,255,.08)}
+#list{flex:1;overflow-y:auto;padding:6px 6px 10px;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.14) transparent}
+.grp{position:sticky;top:-6px;z-index:1;display:flex;align-items:center;gap:8px;margin:8px 0 2px;padding:7px 10px;
+  font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  background:rgba(18,20,26,.96);border-radius:8px}
+.grp i{width:6px;height:6px;border-radius:50%;flex:none}
+.grp .gt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grp .gc{font-family:var(--mono);font-weight:500;letter-spacing:0;color:var(--faint)}
+.mem{all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:9px;
+  font-size:12.5px;line-height:1.4;color:rgba(226,232,240,.76)}
+.mem:hover,.mem.on{background:rgba(255,255,255,.06);color:var(--ink)}
+.mem.on{box-shadow:inset 2px 0 0 var(--dot)}
+.mem:focus-visible{outline:2px solid rgba(255,255,255,.35);outline-offset:-2px}
+.mem i{width:6px;height:6px;border-radius:50%;flex:none;margin-top:6px;background:var(--dot)}
+.mem.hub{color:var(--ink);font-weight:600}
+.mem mark{background:rgba(255,214,102,.22);color:inherit;border-radius:3px;padding:0 1px}
+#more,#empty{padding:14px 10px;text-align:center;font-size:11.5px;color:var(--faint)}
+
 /* hidden until the graph is built, so the panel never flashes "0 memories" */
-#panel,#hint{opacity:0;transition:opacity .5s ease}
-body.ready #panel,body.ready #hint{opacity:1}
+#panel,#hint,#listBtn{opacity:0;transition:opacity .5s ease}
+body.ready #panel,body.ready #hint,body.ready #listBtn{opacity:1}
 
 @media (max-width:640px){
   #panel{top:auto;bottom:44px;left:16px;right:16px;width:auto}
   #layers{flex-direction:row;overflow-x:auto}
   .row{white-space:nowrap;gap:8px}
   #brand .proj{display:none}
+  #drawer{top:54px;left:8px;right:8px;bottom:8px;width:auto;z-index:15}
   #hint{font-size:10px}
 }
-@media (prefers-reduced-motion:reduce){ #tip{transition:none} }
+@media (prefers-reduced-motion:reduce){ #tip,#drawer,#drawer.open{transition:none} }
 </style>
 </head>
 <body>
 <canvas id="c" aria-label="3D map of memories"></canvas>
 
-<div id="brand"><span class="dot"></span><span class="name">Cerebrumma</span><span class="proj">{{project_name}}</span></div>
+<div id="brand"><span class="dot"></span><span class="name">Cerebrumma</span><span class="proj">{{project_name}}</span>
+  <button id="listBtn" aria-expanded="false" aria-controls="drawer" title="Browse and search memories (/)">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>
+    Memories <kbd>/</kbd>
+  </button>
+</div>
+
+<aside id="drawer" class="card" aria-label="Memory list">
+  <div id="dhead">
+    <div id="qwrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Search memories…" autocomplete="off" spellcheck="false" aria-label="Search memories">
+      <span id="qn"></span>
+      <button id="dclose" aria-label="Close list" title="Close (Esc)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+  </div>
+  <div id="list" role="list"></div>
+</aside>
 
 <div id="panel">
   <div class="card" style="padding:12px 6px 6px">
@@ -4301,6 +4363,8 @@ controls.autoRotate = false;
 controls.autoRotateSpeed = 0.35;
 
 function applyViewOffset() {
+  // centre the graph in the space left of the panel. The list drawer overlays the
+  // left edge without moving the graph, so points never slide under the cursor.
   if (W() > 640) camera.setViewOffset(W(), H(), 150, 0, W(), H());
   else camera.clearViewOffset();
 }
@@ -4408,7 +4472,7 @@ function writePositions() {
     grow[i] = t;
     const h = topics[topicOf[i]].hub;
     for (let k = 0; k < 3; k++) pos[i*3+k] = final[h*3+k] + (final[i*3+k] - final[h*3+k]) * t;
-    alpha[i] = (active === 'All' || nodes[i].layer === active ? 1 : .04) * Math.min(1, t * 1.5 + (isHub[i] && introT > delay[i] ? 1 : 0));
+    alpha[i] = dimOf(i) * Math.min(1, t * 1.5 + (isHub[i] && introT > delay[i] ? 1 : 0));
   }
   nodeGeo.attributes.position.needsUpdate = true;
   nodeGeo.attributes.aAlpha.needsUpdate = true;
@@ -4465,16 +4529,163 @@ function select(name, instant) {
   const ids = name === 'All' ? nodes.map(n => n.id) : byLayer[name];
   cnum.textContent = ids.length.toLocaleString();
   document.getElementById('count').style.setProperty('--accent', name === 'All' ? '#e8eaee' : layerCss(name));
-  links.forEach((l, i) => {
-    const on = name === 'All' || (nodes[l.a].layer === name && nodes[l.b].layer === name);
-    lA[i*2] = lA[i*2+1] = on ? l.k : l.k * .05;
-  });
-  lineGeo.attributes.aAlpha.needsUpdate = true;
+  pinned = -1;
+  applyFilters();
   setHover(-1);
-  writePositions();
   frame(ids, instant);
 }
 document.getElementById('reset').addEventListener('click', () => select('All'));
+
+
+// ── Memory list: browse, search, and fly to any memory ──────────────────────
+let query = '', matchSet = null, pinned = -1;
+const inLayer = i => active === 'All' || nodes[i].layer === active;
+const shown = i => inLayer(i) && (!matchSet || matchSet.has(i));
+// other layers fade out; search misses stay faintly visible for context
+const dimOf = i => !inLayer(i) ? .04 : shown(i) ? 1 : .11;
+function applyFilters() {
+  links.forEach((l, i) => { lA[i*2] = lA[i*2+1] = l.k * Math.min(dimOf(l.a), dimOf(l.b)) ** 1.5; });
+  lineGeo.attributes.aAlpha.needsUpdate = true;
+  writePositions();
+  renderList();
+}
+
+const drawer = document.getElementById('drawer');
+const listBtn = document.getElementById('listBtn');
+const listEl = document.getElementById('list');
+const qEl = document.getElementById('q');
+const qnEl = document.getElementById('qn');
+const rowEl = new Map();
+// topics in layer order, biggest first; hub first, then most-connected
+const topicOrder = topics.map((t, i) => i)
+  .sort((a, b) => ORDER.indexOf(topics[a].layer) - ORDER.indexOf(topics[b].layer) || topics[b].members.length - topics[a].members.length);
+const memberOrder = topics.map(t => [t.hub, ...t.members.filter(id => id !== t.hub).sort((a, b) => adj[b].length - adj[a].length || a - b)]);
+const lower = nodes.map(n => n.label.toLowerCase());
+const css = i => { const c = col.subarray(i*3, i*3+3); return `rgb(${c[0]*255|0} ${c[1]*255|0} ${c[2]*255|0})`; };
+
+function setDrawer(open, focus) {
+  drawer.classList.toggle('open', open);
+  listBtn.setAttribute('aria-expanded', open);
+  if (open) { renderList(); if (focus) setTimeout(() => qEl.focus(), 30); }
+}
+listBtn.addEventListener('click', () => setDrawer(!drawer.classList.contains('open'), true));
+document.getElementById('dclose').addEventListener('click', () => setDrawer(false));
+
+function highlight(el, text) {
+  el.textContent = '';
+  const terms = query.split(/\s+/).filter(Boolean);
+  if (!terms.length) { el.textContent = text; return; }
+  const re = new RegExp('(' + terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'gi');
+  text.split(re).forEach((part, k) => {
+    if (k % 2) { const m = document.createElement('mark'); m.textContent = part; el.appendChild(m); }
+    else if (part) el.appendChild(document.createTextNode(part));
+  });
+}
+
+let renderQueue = [], rendered = 0;
+const PAGE = 250;
+function renderList() {
+  if (!drawer.classList.contains('open')) return;
+  listEl.textContent = ''; rowEl.clear(); renderQueue = []; rendered = 0;
+  let total = 0;
+  topicOrder.forEach(ti => {
+    const ids = memberOrder[ti].filter(shown);
+    if (!ids.length) return;
+    renderQueue.push({ ti, ids });
+    total += ids.length;
+  });
+  const scope = active === 'All' ? nodes.length : byLayer[active].length;
+  qnEl.textContent = query ? `${total.toLocaleString()} / ${scope.toLocaleString()}` : scope.toLocaleString();
+  if (!total) {
+    const e = document.createElement('div'); e.id = 'empty';
+    e.textContent = query ? `No memories match “${query}”` : 'No memories in this layer';
+    listEl.appendChild(e); return;
+  }
+  renderMore();
+}
+function renderMore() {
+  document.getElementById('more')?.remove();
+  let budget = PAGE;
+  while (renderQueue.length && budget > 0) {
+    const g = renderQueue[0];
+    if (!g.started) {
+      g.started = true; g.k = 0;
+      const t = topics[g.ti];
+      const h = document.createElement('div'); h.className = 'grp';
+      const dot = document.createElement('i'); dot.style.background = css(t.hub);
+      const gt = document.createElement('span'); gt.className = 'gt'; gt.textContent = t.layer + ' · ' + nodes[t.hub].label;
+      const gc = document.createElement('span'); gc.className = 'gc'; gc.textContent = g.ids.length;
+      h.append(dot, gt, gc); listEl.appendChild(h);
+    }
+    while (g.k < g.ids.length && budget > 0) {
+      const id = g.ids[g.k++]; budget--;
+      const b = document.createElement('button');
+      b.className = 'mem' + (isHub[id] ? ' hub' : '') + (id === pinned ? ' on' : '');
+      b.setAttribute('role', 'listitem');
+      b.style.setProperty('--dot', css(id));
+      const dot = document.createElement('i'); const tx = document.createElement('span');
+      highlight(tx, nodes[id].label);
+      b.append(dot, tx);
+      b.addEventListener('mouseenter', () => setHover(id, true));
+      b.addEventListener('mouseleave', () => setHover(pinned, true));
+      b.addEventListener('focus', () => setHover(id, true));
+      b.addEventListener('click', () => focusMemory(id));
+      listEl.appendChild(b); rowEl.set(id, b);
+    }
+    if (g.k >= g.ids.length) renderQueue.shift();
+  }
+  if (renderQueue.length) {
+    const m = document.createElement('div'); m.id = 'more';
+    const left = renderQueue.reduce((s, g) => s + g.ids.length - (g.k || 0), 0);
+    m.textContent = `${left.toLocaleString()} more…`;
+    listEl.appendChild(m); moreObs.observe(m);
+  }
+}
+const moreObs = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { moreObs.disconnect(); renderMore(); } }, { root: listEl, rootMargin: '300px' });
+
+function focusMemory(id, reveal) {   // reveal: clicked in the graph, so keep the camera still
+  pinned = id;
+  rowEl.forEach((b, k) => b.classList.toggle('on', k === id));
+  setHover(id, true);
+  if (!reveal) frame(topics[topicOf[id]].members);
+  idle();
+  if (reveal) {
+    if (!drawer.classList.contains('open')) setDrawer(true);
+    let b = rowEl.get(id);
+    while (!b && renderQueue.length) { renderMore(); b = rowEl.get(id); }
+    if (b) { b.classList.add('on'); b.scrollIntoView({ block: 'center' }); }
+  }
+}
+
+let qTimer = null;
+qEl.addEventListener('input', () => {
+  clearTimeout(qTimer);
+  qTimer = setTimeout(() => {
+    query = qEl.value.trim();
+    const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+    matchSet = terms.length ? new Set(nodes.filter(n => terms.every(t => lower[n.id].includes(t))).map(n => n.id)) : null;
+    if (pinned !== -1 && !shown(pinned)) pinned = -1;
+    setHover(pinned, true);
+    applyFilters();
+    listEl.scrollTop = 0;
+  }, 90);
+});
+qEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const ids = nodes.filter(n => shown(n.id)).map(n => n.id);
+    if (ids.length) frame(ids);
+    listEl.querySelector('.mem')?.focus();
+  }
+});
+window.addEventListener('keydown', e => {
+  const typing = e.target === qEl;
+  if (e.key === '/' && !typing) { e.preventDefault(); setDrawer(true, true); }
+  else if (e.key === 'Escape') {
+    if (qEl.value) { qEl.value = ''; qEl.dispatchEvent(new Event('input')); }
+    else if (pinned !== -1) { pinned = -1; rowEl.forEach(b => b.classList.remove('on')); setHover(-1); }
+    else setDrawer(false);
+  }
+});
 
 // ── Hover (screen-space picking) ─────────────────────────────────────────────
 const tip = document.getElementById('tip');
@@ -4496,9 +4707,10 @@ function pickAt(mx, my) {
   }
   return best;
 }
-function setHover(id) {
-  if (id === hov) return;
-  hov = id;
+let hovQuiet = false;
+function setHover(id, quiet = false) {
+  if (id === hov && quiet === hovQuiet) return;
+  hov = id; hovQuiet = quiet;
   if (id === -1) { hlGeo.setDrawRange(0, 0); ring.visible = false; tip.classList.remove('on'); return; }
   let k = 0;
   const seg = (a, b) => { hlPos.set([pos[a*3], pos[a*3+1], pos[a*3+2], pos[b*3], pos[b*3+1], pos[b*3+2]], k * 6); k++; };
@@ -4514,7 +4726,7 @@ function setHover(id) {
   const nl = adj[id].length;
   tip.querySelector('.k').textContent = nodes[id].layer + (isHub[id] ? ' · topic hub' : '') + (nl ? ` · ${nl} link${nl === 1 ? '' : 's'}` : '');
   tip.querySelector('.v').textContent = nodes[id].label;
-  tip.classList.add('on');
+  tip.classList.toggle('on', !quiet);
   controls.autoRotate = false;
 }
 function placeTip() {
@@ -4531,10 +4743,18 @@ function idle() {
   clearTimeout(idleTimer);
   if (!STATIC) idleTimer = setTimeout(() => { if (hov === -1) controls.autoRotate = true; }, 6000);
 }
-canvas.addEventListener('pointerdown', () => { dragging = true; fly = null; idle(); });
-window.addEventListener('pointerup', () => { dragging = false; });
+let downAt = null;
+canvas.addEventListener('pointerdown', e => { dragging = true; fly = null; downAt = { x: e.clientX, y: e.clientY }; idle(); });
+window.addEventListener('pointerup', e => {
+  const click = downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 5;
+  dragging = false; downAt = null;
+  if (click && e.target === canvas) {
+    const id = pickAt(e.clientX, e.clientY);
+    if (id !== -1) focusMemory(id, true);
+  }
+});
 canvas.addEventListener('pointermove', e => { mouse = { x: e.clientX, y: e.clientY }; });
-canvas.addEventListener('pointerleave', () => { mouse = null; setHover(-1); });
+canvas.addEventListener('pointerleave', () => { mouse = null; setHover(pinned, true); });
 canvas.addEventListener('wheel', () => { fly = null; idle(); }, { passive: true });
 
 window.addEventListener('resize', () => {
@@ -4584,7 +4804,7 @@ function tick() {
     if (fly.t >= 1) fly = null;
   }
   controls.update();
-  if (!dragging && mouse) setHover(pickAt(mouse.x, mouse.y));
+  if (!dragging && mouse) { const p = pickAt(mouse.x, mouse.y); setHover(p !== -1 ? p : pinned, p === -1); }
   else if (dragging && hov !== -1) setHover(-1);
   placeTip();
   renderer.render(scene, camera);
