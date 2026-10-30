@@ -2,7 +2,7 @@
 name = "cerebrumma"
 version = "0.2.4"
 edition = "2021"
-authors = ["Ben Peralta <benperalta24@gmail.com>"]
+authors = ["Medina Apps LLC <info@valethero.org>"]
 description = "Portable, git-tracked memory and governance for AI agents"
 license = "MIT OR Apache-2.0"
 
