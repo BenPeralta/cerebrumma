@@ -114,7 +114,7 @@ Every entry is plain Markdown with YAML frontmatter — human-readable, git-diff
 | `cerebrum why <query>` | Contextual trace explaining "why" a rule exists |
 | `cerebrum validate` | Detect conflicts, stale approvals, and unsafe runtime knowledge |
 | `cerebrum publish` | Produce a deterministic, versioned runtime snapshot for agents |
-| `cerebrum config` | Set LLM providers and API keys |
+| `cerebrum config` | Set LLM provider, model, and API keys |
 
 ## Global + Local Brain Hierarchy
 
@@ -165,11 +165,19 @@ Dream-generated insights cannot become approved runtime truth without an explici
 
 ## Dream Cycle (Autopilot Gardener)
 
-The Brain can self-improve on autopilot. First, configure your LLM provider (keys are stored securely in `~/.cerebrum/config.json`):
+The Brain can self-improve on autopilot. Configure a provider, then provide a key through the environment or a prompt. Keys saved by `cerebrum config` are written to `~/.cerebrum/config.json` with mode `0600`. A key in the environment overrides the file. Keys are not accepted on the command line.
 
 ```sh
+export GEMINI_API_KEY=...          # or ANTHROPIC_API_KEY
 cerebrum config set provider gemini
-cerebrum config set api_key YOUR_API_KEY
+cerebrum config set gemini_key     # reads $GEMINI_API_KEY, or prompts
+```
+
+Optional model overrides (defaults are `gemini-3.5-flash-lite` and `claude-sonnet-5-5`):
+
+```sh
+cerebrum config set gemini_model gemini-3.8-flash
+cerebrum config set anthropic_model claude-sonnet-5-5
 ```
 
 Then, trigger a dream cycle manually or let the background daemon handle it:

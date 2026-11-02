@@ -3,7 +3,7 @@ use chrono::Utc;
 use colored::*;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::daemon::check_dream_saturation;
 use crate::git::hook_install;
@@ -19,6 +19,9 @@ pub struct Entry {
     pub salience_score: f32,
     pub bias_flag: bool,
     pub provenance: String,
+    /// Model-written text that has not been accepted by a person.
+    #[serde(default)]
+    pub unreviewed: bool,
     pub content: String,
 }
 
@@ -70,14 +73,14 @@ pub fn ts_stem(ts: &str) -> String {
         .to_string()
 }
 
-pub fn make_episodic_path(brain: &PathBuf, tag: &str) -> PathBuf {
+pub fn make_episodic_path(brain: &Path, tag: &str) -> PathBuf {
     let stem = ts_stem(&Utc::now().to_rfc3339());
     brain
         .join("memory/episodic")
         .join(format!("{stem}-{tag}.md"))
 }
 
-pub fn write_entry(path: &PathBuf, entry: &Entry) -> Result<()> {
+pub fn write_entry(path: &Path, entry: &Entry) -> Result<()> {
     let yaml = serde_yaml::to_string(entry)?;
     fs::write(path, format!("---\n{yaml}---\n"))?;
     Ok(())
@@ -91,6 +94,7 @@ pub fn init_brain(path: PathBuf) -> Result<()> {
             path.display()
         );
         let _ = init_vector_db(&path);
+        let _ = ensure_brain_gitignore(&path);
         return Ok(());
     }
 
@@ -108,6 +112,7 @@ pub fn init_brain(path: PathBuf) -> Result<()> {
         "memory/procedural/protocols",
         "memory/procedural/permissions",
         "memory/procedural/escalations",
+        "memory/procedural/policies",
         "memory/personal",
         "memory/brand/voice",
         "memory/brand/examples",
@@ -129,6 +134,7 @@ pub fn init_brain(path: PathBuf) -> Result<()> {
         path.join("config.json"),
         include_str!("../config.default.json"),
     )?;
+    ensure_brain_gitignore(&path)?;
 
     let now = Utc::now().to_rfc3339();
     let welcome = include_str!("../templates/welcome.md").replace("{{timestamp}}", &now);
@@ -199,6 +205,7 @@ pub async fn add_entry(content: String, path: PathBuf) -> Result<()> {
             salience_score: 0.6,
             bias_flag: false,
             provenance: "manual".to_string(),
+            unreviewed: false,
             content: content.clone(),
         },
     )?;
@@ -215,7 +222,7 @@ pub async fn add_entry(content: String, path: PathBuf) -> Result<()> {
     Ok(())
 }
 
-pub fn load_episodes(brain: &PathBuf) -> Vec<(PathBuf, String)> {
+pub fn load_episodes(brain: &Path) -> Vec<(PathBuf, String)> {
     let dir = brain.join("memory/episodic");
     if !dir.exists() {
         return vec![];
@@ -236,6 +243,16 @@ pub fn load_episodes(brain: &PathBuf) -> Vec<(PathBuf, String)> {
         .collect();
     entries.sort_by_key(|(p, _)| p.clone());
     entries
+}
+
+/// Keep the vector index and daemon log out of git when a project commits `.cerebrum/`.
+pub fn ensure_brain_gitignore(brain: &Path) -> Result<()> {
+    let path = brain.join(".gitignore");
+    if path.exists() {
+        return Ok(());
+    }
+    fs::write(path, "embeddings.db\ndaemon.log\n")?;
+    Ok(())
 }
 
 pub fn get_latest_content(dir: PathBuf) -> Option<String> {

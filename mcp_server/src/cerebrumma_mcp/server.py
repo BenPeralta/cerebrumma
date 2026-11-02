@@ -1,4 +1,5 @@
 import json
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -8,6 +9,23 @@ mcp = FastMCP("cerebrumma")
 
 _LOCAL = Path(".cerebrum")
 _GLOBAL = Path.home() / ".cerebrum"
+
+# Joined under `<brain>/memory`. Anything else, including `..`, is rejected.
+_LAYER_ALLOWLIST = {
+    "working",
+    "episodic",
+    "semantic",
+    "personal",
+    "procedural/skills",
+    "procedural/protocols",
+    "procedural/permissions",
+    "procedural/escalations",
+    "procedural/policies",
+    "brand/voice",
+    "brand/examples",
+    "objectives/company",
+    "objectives/roles",
+}
 
 
 def brain_paths() -> list[Path]:
@@ -22,8 +40,22 @@ def ensure_brain() -> None:
         )
 
 
+def resolve_layer(brain: Path, layer: str) -> Path:
+    """Return `<brain>/memory/<layer>` or raise if `layer` is not allowlisted."""
+    if layer not in _LAYER_ALLOWLIST:
+        allowed = ", ".join(sorted(_LAYER_ALLOWLIST))
+        raise ValueError(f"layer must be one of: {allowed}")
+    root = (brain / "memory").resolve()
+    target = (root / layer).resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as exc:
+        raise ValueError("layer escapes the memory directory") from exc
+    return target
+
+
 def _read_layer(brain: Path, layer: str, limit: int) -> list[dict]:
-    layer_path = brain / "memory" / layer
+    layer_path = resolve_layer(brain, layer)
     if not layer_path.exists():
         return []
     entries = []
@@ -42,7 +74,7 @@ def read_memory(layer: str = "episodic", limit: int = 10) -> str:
     """Read the most recent entries from a memory layer (merges local + global).
 
     Args:
-        layer: One of working | episodic | semantic | personal
+        layer: Allowlisted layer, for example episodic, semantic, personal, or procedural/skills
         limit: Max number of entries to return
     """
     ensure_brain()
@@ -59,19 +91,52 @@ def read_memory(layer: str = "episodic", limit: int = 10) -> str:
     return json.dumps(list(seen.values())[:limit], indent=2)
 
 
-@mcp.tool()
-def search_memory(query: str, limit: int = 5) -> str:
-    """Keyword search across episodic and semantic memory (local + global).
+def _vector_search(query: str, limit: int) -> list[dict] | None:
+    """Query the Rust sqlite-vec index. None means the index is unavailable."""
+    try:
+        proc = subprocess.run(
+            ["cerebrum", "search", "--json", "--limit", str(limit), "--", query],
+            capture_output=True,
+            text=True,
+            timeout=180,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return None
+    try:
+        payload = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        return None
+    if not payload.get("ok"):
+        return None
+    results = []
+    for hit in payload.get("results", []):
+        path = str(hit.get("path", ""))
+        layer = "other"
+        marker = "/memory/"
+        if marker in path:
+            layer = path.split(marker, 1)[1].rsplit("/", 1)[0]
+        content = str(hit.get("content", ""))
+        results.append({
+            "file": Path(path).name,
+            "brain": hit.get("brain", "local"),
+            "layer": layer,
+            "snippet": content[:300],
+            "distance": hit.get("distance"),
+        })
+    return results
 
-    Args:
-        query: Search string (case-insensitive)
-        limit: Max number of results
-    """
-    ensure_brain()
+
+def _keyword_search(query: str, limit: int) -> list[dict]:
     results = []
     for brain in brain_paths():
-        for layer in ["episodic", "semantic"]:
-            layer_path = brain / "memory" / layer
+        for layer in ("episodic", "semantic", "procedural/skills", "procedural/protocols"):
+            try:
+                layer_path = resolve_layer(brain, layer)
+            except ValueError:
+                continue
             if not layer_path.exists():
                 continue
             for f in sorted(layer_path.glob("*.md"), reverse=True):
@@ -84,24 +149,50 @@ def search_memory(query: str, limit: int = 5) -> str:
                         "snippet": text[:300],
                     })
                 if len(results) >= limit:
-                    break
+                    return results
+    return results
+
+
+@mcp.tool()
+def search_memory(query: str, limit: int = 5) -> str:
+    """Semantic search across the Brain's vector index (local + global).
+
+    Falls back to a keyword scan when the index has not been built yet.
+
+    Args:
+        query: Search string
+        limit: Max number of results
+    """
+    ensure_brain()
+    limit = max(1, min(limit, 20))
+    results = _vector_search(query, limit)
+    if results is None:
+        results = _keyword_search(query, limit)
     return json.dumps(results, indent=2) if results else "No matches found."
 
 
 @mcp.tool()
 def get_protocols() -> str:
-    """Return all active procedural protocols from local + global Brains."""
+    """Return procedural skills and protocols from local + global Brains.
+
+    Dream cycles write rules to procedural/skills. Hand-written protocols stay
+    in procedural/protocols. Both are returned.
+    """
     ensure_brain()
     all_protocols: list[str] = []
-    seen: set[str] = set()
+    seen: set[tuple[str, str]] = set()
     for brain in brain_paths():
-        protocols_dir = brain / "memory" / "procedural" / "protocols"
-        if not protocols_dir.exists():
-            continue
-        for f in sorted(protocols_dir.glob("*.md")):
-            if f.name not in seen:
-                seen.add(f.name)
-                all_protocols.append(f.read_text())
+        label = "local" if brain == _LOCAL else "global"
+        for kind in ("skills", "protocols"):
+            directory = brain / "memory" / "procedural" / kind
+            if not directory.exists():
+                continue
+            for f in sorted(directory.glob("*.md")):
+                key = (kind, f.name)
+                if key in seen:
+                    continue
+                seen.add(key)
+                all_protocols.append(f"# {label} procedural/{kind}/{f.name}\n{f.read_text()}")
     if not all_protocols:
         return "No protocols defined yet."
     return "\n\n---\n\n".join(all_protocols)
@@ -156,6 +247,49 @@ def _query_terms(value: str) -> set[str]:
     }
 
 
+def select_business_entries(
+    entries: list[dict],
+    query: str,
+    role: str,
+    customer_facing: bool,
+    limit: int,
+    now: datetime,
+) -> list[dict]:
+    """Role-scoped entries that actually overlap the query.
+
+    A high-authority policy with no shared terms is not returned.
+    """
+    query_terms = _query_terms(query)
+    if not query_terms:
+        return []
+    normalized_role = role.strip().lower()
+    ranked = []
+    for entry in entries:
+        if not _is_live(entry, now):
+            continue
+        scopes = {str(scope).lower() for scope in entry.get("scope", [])}
+        if normalized_role not in scopes and "all" not in scopes:
+            continue
+        if customer_facing and not entry.get("customer_safe", False):
+            continue
+        searchable = " ".join([
+            str(entry.get("id", "")),
+            str(entry.get("authority", "")),
+            str(entry.get("conflict_key", "")),
+            str(entry.get("content", "")),
+        ])
+        overlap = len(query_terms & _query_terms(searchable))
+        if overlap == 0:
+            continue
+        authority_bonus = 1 if entry.get("authority") in {
+            "company_policy", "product_truth", "pricing_truth", "legal_policy"
+        } else 0
+        ranked.append((overlap + authority_bonus, entry))
+    ranked.sort(key=lambda item: (-item[0], item[1].get("id", "")))
+    cap = max(1, min(limit, 20))
+    return [entry for _, entry in ranked[:cap]]
+
+
 @mcp.tool()
 def get_business_context(
     query: str,
@@ -177,34 +311,16 @@ def get_business_context(
     """
     ensure_brain()
     snapshot_path, snapshot = _runtime_snapshot()
-    query_terms = _query_terms(query)
     normalized_role = role.strip().lower()
-    ranked = []
     now = datetime.now(timezone.utc)
-
-    for entry in snapshot.get("entries", []):
-        if not _is_live(entry, now):
-            continue
-        scopes = {str(scope).lower() for scope in entry.get("scope", [])}
-        if normalized_role not in scopes and "all" not in scopes:
-            continue
-        if customer_facing and not entry.get("customer_safe", False):
-            continue
-
-        searchable = " ".join([
-            str(entry.get("id", "")),
-            str(entry.get("authority", "")),
-            str(entry.get("conflict_key", "")),
-            str(entry.get("content", "")),
-        ])
-        overlap = len(query_terms & _query_terms(searchable))
-        authority_bonus = 1 if entry.get("authority") in {
-            "company_policy", "product_truth", "pricing_truth", "legal_policy"
-        } else 0
-        ranked.append((overlap + authority_bonus, entry))
-
-    ranked.sort(key=lambda item: (-item[0], item[1].get("id", "")))
-    selected = [entry for _, entry in ranked[:max(1, min(limit, 20))]]
+    selected = select_business_entries(
+        snapshot.get("entries", []),
+        query,
+        normalized_role,
+        customer_facing,
+        limit,
+        now,
+    )
     return json.dumps({
         "schema_version": snapshot.get("schema_version"),
         "brain_version": snapshot.get("brain_version"),
@@ -241,12 +357,36 @@ def add_entry(content: str, layer: str = "episodic") -> str:
         "---\n\n"
         f"{content}\n"
     )
-    target = brain / "memory" / layer
+    target = resolve_layer(brain, layer)
     target.mkdir(parents=True, exist_ok=True)
     path = target / f"{timestamp}.md"
     path.write_text(entry)
+    indexed = _embed_file(brain, path, content)
     label = "local" if brain == _LOCAL else "global"
-    return f"Saved to {label} {layer}: {path.name}"
+    suffix = "" if indexed else " (not indexed)"
+    return f"Saved to {label} {layer}: {path.name}{suffix}"
+
+
+def _embed_file(brain: Path, path: Path, content: str) -> bool:
+    try:
+        proc = subprocess.run(
+            [
+                "cerebrum",
+                "embed",
+                "--brain",
+                str(brain.resolve()),
+                "--file",
+                str(path.resolve()),
+            ],
+            input=content,
+            text=True,
+            capture_output=True,
+            timeout=180,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return proc.returncode == 0
 
 
 @mcp.tool()

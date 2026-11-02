@@ -1,4 +1,5 @@
 target/
+embeddings.db
 .cerebrum/
 .fastembed_cache/
 reflection-response.md

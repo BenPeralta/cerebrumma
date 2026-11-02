@@ -4,7 +4,7 @@ use colored::*;
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -97,6 +97,7 @@ pub async fn watch_daemon() -> Result<()> {
                     salience_score: 0.4,
                     bias_flag: false,
                     provenance: "auto".to_string(),
+                    unreviewed: false,
                     content: content.clone(),
                 },
             ) {
@@ -117,7 +118,7 @@ const DREAM_SATURATION_THRESHOLD: usize = 10;
 // …and never more often than this, so a burst of commits can't spam the API.
 const DREAM_COOLDOWN_HOURS: i64 = 6;
 
-pub async fn check_dream_saturation(brain: &PathBuf) -> Result<()> {
+pub async fn check_dream_saturation(brain: &Path) -> Result<()> {
     let episodic_dir = brain.join("memory/episodic");
     if !episodic_dir.exists() {
         return Ok(());

@@ -22,12 +22,17 @@ pub enum Commands {
     },
     /// Add a new entry to episodic memory
     Add {
-        content: String,
+        /// Memory text. Omit when using --from-hook.
+        #[arg(required_unless_present = "from_hook")]
+        content: Option<String>,
         #[arg(
             long,
             help = "Write to the global Brain (~/.cerebrum/) instead of local"
         )]
         global: bool,
+        /// Read a git-hook payload from the environment (no shell interpolation)
+        #[arg(long)]
+        from_hook: bool,
     },
     /// Show Brain status
     Status,
@@ -64,7 +69,15 @@ pub enum Commands {
     /// Trace the origin of a specific rule or insight
     Why { query: String },
     /// Semantic search across all memory layers
-    Search { query: String },
+    Search {
+        query: String,
+        /// Print machine-readable JSON (local and global indexes)
+        #[arg(long)]
+        json: bool,
+        /// Maximum matches to return
+        #[arg(long, default_value_t = 5)]
+        limit: usize,
+    },
     /// Digital Janitor: Resolve technical debt flagged in audits
     Fix,
     /// Visualize the Brain: Generate a premium HTML report
@@ -94,6 +107,15 @@ pub enum Commands {
         #[arg(short, long, value_name = "FILE")]
         output: Option<PathBuf>,
     },
+    /// Index one memory file already on disk. Content is read from stdin.
+    Embed {
+        /// Brain root (.cerebrum or ~/.cerebrum)
+        #[arg(long)]
+        brain: PathBuf,
+        /// Memory file to associate with the vector
+        #[arg(long)]
+        file: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -108,8 +130,15 @@ pub enum DaemonAction {
 
 #[derive(Subcommand)]
 pub enum ConfigAction {
-    /// Set a configuration value (e.g. gemini_key)
-    Set { key: String, value: String },
+    /// Set a configuration value.
+    ///
+    /// API keys (`gemini_key`, `anthropic_key`) are not accepted on the command
+    /// line. They are read from the environment or an interactive prompt.
+    Set {
+        key: String,
+        /// Value for non-secret settings such as `provider` or `gemini_model`.
+        value: Option<String>,
+    },
     /// Show current configuration (keys are masked)
     Get,
 }

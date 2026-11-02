@@ -3,8 +3,7 @@ name = "cerebrumma-mcp"
 version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp>=1.0",
-    "pyyaml>=6.0",
+    "mcp>=1.0,<2",
 ]
 
 [build-system]

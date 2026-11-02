@@ -76,9 +76,7 @@ pub fn handle_template(list: bool, apply: Option<String>) -> Result<()> {
     if list {
         println!(
             "{}",
-            "Available templates (coming soon):"
-                .bright_magenta()
-                .bold()
+            "Available templates (coming soon):".bright_magenta().bold()
         );
         println!("   • equitable-react");
         println!("   • startup-ops");
@@ -142,8 +140,8 @@ pub fn run_audit() -> Result<()> {
 
     // Sort: .md files first!
     files_to_read.sort_by(|a, b| {
-        let a_is_md = a.extension().map_or(false, |e| e == "md");
-        let b_is_md = b.extension().map_or(false, |e| e == "md");
+        let a_is_md = a.extension().is_some_and(|e| e == "md");
+        let b_is_md = b.extension().is_some_and(|e| e == "md");
         if a_is_md && !b_is_md {
             return std::cmp::Ordering::Less;
         }
@@ -160,7 +158,7 @@ pub fn run_audit() -> Result<()> {
                 let relative = path.strip_prefix(&cwd).unwrap_or(path);
                 contexts.push_str(&format!("\n--- {} ---\n", relative.display()));
                 contexts.push_str(&content.chars().take(2000).collect::<String>());
-                contexts.push_str("\n");
+                contexts.push('\n');
                 file_count += 1;
             }
         }
@@ -178,13 +176,27 @@ pub fn run_audit() -> Result<()> {
     // Store the audit prompt in vector DB for context search
     let _ = store_vector(&brain, &prompt, "dream/Audit-Prompt.md");
 
-    println!("   {} Scanned {} high-salience files", "→".dimmed(), file_count);
-    println!("   {} Audit prompt → {}", "→".dimmed(), prompt_path.display());
+    println!(
+        "   {} Scanned {} high-salience files",
+        "→".dimmed(),
+        file_count
+    );
+    println!(
+        "   {} Audit prompt → {}",
+        "→".dimmed(),
+        prompt_path.display()
+    );
     println!();
     println!("{}", "Next steps:".bold());
-    println!("   1. Open {} and paste it into your AI", prompt_path.display());
+    println!(
+        "   1. Open {} and paste it into your AI",
+        prompt_path.display()
+    );
     println!("   2. Save the AI's response as a .md file");
-    println!("   3. Run: {}", format!("cerebrum dream --ingest <response.md>").yellow());
+    println!(
+        "   3. Run: {}",
+        "cerebrum dream --ingest <response.md>".to_string().yellow()
+    );
 
     Ok(())
 }
@@ -260,16 +272,26 @@ You are joining an active coding session. Here is the current state of the proje
     fs::create_dir_all(brief_path.parent().unwrap())?;
     fs::write(&brief_path, brief)?;
 
-    println!("   {} Brief generated → {}", "→".dimmed(), brief_path.display());
+    println!(
+        "   {} Brief generated → {}",
+        "→".dimmed(),
+        brief_path.display()
+    );
     println!();
     println!("{}", "Next steps:".bold());
-    println!("   1. Paste {} into your new AI session", brief_path.display());
+    println!(
+        "   1. Paste {} into your new AI session",
+        brief_path.display()
+    );
 
     Ok(())
 }
 
 pub fn run_fix() -> Result<()> {
-    println!("{} Digital Janitor: Reviewing technical debt...", "→".bright_magenta());
+    println!(
+        "{} Digital Janitor: Reviewing technical debt...",
+        "→".bright_magenta()
+    );
 
     let brain = active_brain().ok_or_else(|| anyhow::anyhow!("No Brain found."))?;
 
@@ -282,7 +304,7 @@ pub fn run_fix() -> Result<()> {
     let mut files: Vec<_> = fs::read_dir(&dream_dir)?
         .filter_map(|e| e.ok())
         .filter(|e| {
-            e.path().extension().map_or(false, |ext| ext == "md")
+            e.path().extension().is_some_and(|ext| ext == "md")
                 && e.file_name() != "Audit-Prompt.md"
                 && e.file_name() != "Session-Brief.md"
         })
@@ -324,6 +346,21 @@ pub fn run_fix() -> Result<()> {
     Ok(())
 }
 
+pub fn html_escape(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for c in value.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#39;"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
 pub fn run_map(graph: bool) -> Result<()> {
     if graph {
         return run_map_graph();
@@ -334,7 +371,7 @@ pub fn run_map(graph: bool) -> Result<()> {
     let brain = active_brain().ok_or_else(|| anyhow::anyhow!("No Brain found."))?;
 
     let cwd = std::env::current_dir()?;
-    let project_name = cwd.file_name().unwrap_or_default().to_string_lossy();
+    let project_name = html_escape(&cwd.file_name().unwrap_or_default().to_string_lossy());
 
     // 1. Gather Data
     let insights = get_latest_content(brain.join("memory/semantic")).unwrap_or_default();
@@ -352,8 +389,8 @@ pub fn run_map(graph: bool) -> Result<()> {
             let name = path.file_name().unwrap_or_default().to_string_lossy();
             format!(
                 r#"<div class="history-item"><span class="timestamp">{}</span><span>{}</span></div>"#,
-                name.strip_suffix(".md").unwrap_or(&name),
-                text.lines().next().unwrap_or("").trim()
+                html_escape(name.strip_suffix(".md").unwrap_or(&name)),
+                html_escape(text.lines().next().unwrap_or("").trim())
             )
         })
         .collect::<Vec<_>>()
@@ -362,21 +399,36 @@ pub fn run_map(graph: bool) -> Result<()> {
     let insights_html = insights
         .lines()
         .filter(|l| l.starts_with("- ") || l.starts_with("• "))
-        .map(|l| format!("<li>{}</li>", if l.len() > 2 { &l[2..] } else { "" }))
+        .map(|l| {
+            format!(
+                "<li>{}</li>",
+                html_escape(if l.len() > 2 { &l[2..] } else { "" })
+            )
+        })
         .collect::<Vec<_>>()
         .join("\n");
 
     let rules_html = rules
         .lines()
         .filter(|l| l.starts_with("- ") || l.starts_with("• "))
-        .map(|l| format!("<li>{}</li>", if l.len() > 2 { &l[2..] } else { "" }))
+        .map(|l| {
+            format!(
+                "<li>{}</li>",
+                html_escape(if l.len() > 2 { &l[2..] } else { "" })
+            )
+        })
         .collect::<Vec<_>>()
         .join("\n");
 
     let equity_html = equity
         .lines()
         .filter(|l| l.starts_with("- ") || l.starts_with("• "))
-        .map(|l| format!("<li>{}</li>", if l.len() > 2 { &l[2..] } else { "" }))
+        .map(|l| {
+            format!(
+                "<li>{}</li>",
+                html_escape(if l.len() > 2 { &l[2..] } else { "" })
+            )
+        })
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -399,9 +451,7 @@ pub fn run_map(graph: bool) -> Result<()> {
 
     // 3. Open it (Mac only)
     #[cfg(target_os = "macos")]
-    let _ = std::process::Command::new("open")
-        .arg(&output_path)
-        .spawn();
+    let _ = std::process::Command::new("open").arg(&output_path).spawn();
 
     Ok(())
 }
@@ -412,7 +462,7 @@ pub fn run_map_graph() -> Result<()> {
     let brain = active_brain().ok_or_else(|| anyhow::anyhow!("No Brain found."))?;
 
     let cwd = std::env::current_dir()?;
-    let project_name = cwd.file_name().unwrap_or_default().to_string_lossy();
+    let project_name = html_escape(&cwd.file_name().unwrap_or_default().to_string_lossy());
 
     let data = build_graph_data(&brain)?;
     println!(
@@ -442,4 +492,17 @@ pub fn run_map_graph() -> Result<()> {
     let _ = std::process::Command::new("open").arg(&output_path).spawn();
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn html_escape_neutralizes_markup() {
+        assert_eq!(
+            html_escape("<script>&\"'</script>"),
+            "&lt;script&gt;&amp;&quot;&#39;&lt;/script&gt;"
+        );
+    }
 }
