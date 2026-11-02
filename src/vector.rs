@@ -1,12 +1,22 @@
 use anyhow::{bail, Result};
 use colored::*;
-use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
+use fastembed::{
+    InitOptionsUserDefined, Pooling, TextEmbedding, TokenizerFiles, UserDefinedEmbeddingModel,
+};
+use hf_hub::api::sync::ApiBuilder;
+use hf_hub::{Repo, RepoType};
 use rusqlite::{params, Connection};
 use serde::Serialize;
 use std::collections::HashSet;
 use std::fs;
 use std::io::Read;
 use std::path::Path;
+use std::sync::{Mutex, MutexGuard, OnceLock};
+
+/// ONNX export fastembed calls `BGESmallENV15`. Pinned so a moving `main`
+/// branch cannot change vectors under an existing index.
+const BGE_SMALL_REPO: &str = "Xenova/bge-small-en-v1.5";
+const BGE_SMALL_REVISION: &str = "ea104dacec62c0de699686887e3f920caeb4f3e3";
 
 use crate::memory::{active_brain, global_brain_path, local_brain_path};
 
@@ -35,23 +45,86 @@ pub fn init_vector_db(brain: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn get_embedding(text: &str) -> Result<Vec<f32>> {
-    // Keep the model cache GLOBAL (~/.cerebrum/models), never in the project cwd —
-    // otherwise `.fastembed_cache/` leaks into the user's repo and their next commit.
-    let cache_dir = dirs::home_dir()
+fn model_cache_dir() -> std::path::PathBuf {
+    // Keep the model cache global, never in the project cwd — otherwise
+    // `.fastembed_cache/` leaks into the user's repo and their next commit.
+    dirs::home_dir()
         .unwrap_or_default()
         .join(".cerebrum")
-        .join("models");
-    let _ = fs::create_dir_all(&cache_dir);
+        .join("models")
+}
 
-    let model = TextEmbedding::try_new(
-        InitOptions::new(EmbeddingModel::BGESmallENV15)
-            .with_show_download_progress(true)
-            .with_cache_dir(cache_dir),
-    )?;
+fn load_embedder() -> Result<TextEmbedding> {
+    let cache_dir = model_cache_dir();
+    fs::create_dir_all(&cache_dir)?;
+    let api = ApiBuilder::new()
+        .with_cache_dir(cache_dir)
+        .with_progress(true)
+        .build()
+        .map_err(|err| anyhow::anyhow!("failed to open the Hugging Face cache: {err}"))?;
+    let repo = api.repo(Repo::with_revision(
+        BGE_SMALL_REPO.to_string(),
+        RepoType::Model,
+        BGE_SMALL_REVISION.to_string(),
+    ));
+    let read = |name: &str| -> Result<Vec<u8>> {
+        let path = repo.get(name).map_err(|err| {
+            anyhow::anyhow!("failed to fetch {name} at {BGE_SMALL_REVISION}: {err}")
+        })?;
+        Ok(fs::read(path)?)
+    };
+    let model = UserDefinedEmbeddingModel::new(
+        read("onnx/model.onnx")?,
+        TokenizerFiles {
+            tokenizer_file: read("tokenizer.json")?,
+            config_file: read("config.json")?,
+            special_tokens_map_file: read("special_tokens_map.json")?,
+            tokenizer_config_file: read("tokenizer_config.json")?,
+        },
+    )
+    .with_pooling(Pooling::Cls);
+    TextEmbedding::try_new_from_user_defined(model, InitOptionsUserDefined::new())
+        .map_err(|err| anyhow::anyhow!("failed to load the BGE-small ONNX session: {err}"))
+}
 
-    let embeddings = model.embed(vec![text], None)?;
-    Ok(embeddings[0].clone())
+fn embedder() -> Result<MutexGuard<'static, TextEmbedding>> {
+    static MODEL: OnceLock<Mutex<TextEmbedding>> = OnceLock::new();
+    if let Some(mutex) = MODEL.get() {
+        return Ok(mutex
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()));
+    }
+    let model = Mutex::new(load_embedder()?);
+    // A concurrent caller may win the race; dropping the spare session is fine.
+    let _ = MODEL.set(model);
+    let mutex = MODEL
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("embedding session was not stored"))?;
+    Ok(mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bge_small_revision_is_a_commit() {
+        assert_eq!(BGE_SMALL_REVISION.len(), 40);
+        assert!(BGE_SMALL_REVISION.chars().all(|c| c.is_ascii_hexdigit()));
+        assert_eq!(BGE_SMALL_REPO, "Xenova/bge-small-en-v1.5");
+    }
+}
+
+pub fn get_embedding(text: &str) -> Result<Vec<f32>> {
+    let mut model = embedder()?;
+    let mut embeddings = model
+        .embed([text], None)
+        .map_err(|err| anyhow::anyhow!("embedding failed: {err}"))?;
+    embeddings
+        .pop()
+        .ok_or_else(|| anyhow::anyhow!("embedding model returned no vector"))
 }
 
 pub fn store_vector(brain: &Path, content: &str, path: &str) -> Result<()> {

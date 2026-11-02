@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Utc};
 use colored::*;
 use serde::Serialize;
-use serde_yaml::{Mapping, Value};
+use serde_norway::{Mapping, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -124,7 +124,7 @@ fn split_frontmatter(text: &str) -> Result<(Mapping, String)> {
         .context("frontmatter opens with --- but has no closing ---")?;
     let yaml = &rest[..delimiter];
     let body = rest[delimiter + 4..].trim();
-    let value: Value = serde_yaml::from_str(yaml).context("invalid YAML frontmatter")?;
+    let value: Value = serde_norway::from_str(yaml).context("invalid YAML frontmatter")?;
     let map = value.as_mapping().cloned().unwrap_or_default();
     let content = if body.is_empty() {
         string_value(&map, "content").unwrap_or_default()
