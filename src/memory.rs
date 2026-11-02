@@ -81,7 +81,7 @@ pub fn make_episodic_path(brain: &Path, tag: &str) -> PathBuf {
 }
 
 pub fn write_entry(path: &Path, entry: &Entry) -> Result<()> {
-    let yaml = serde_yaml::to_string(entry)?;
+    let yaml = serde_norway::to_string(entry)?;
     fs::write(path, format!("---\n{yaml}---\n"))?;
     Ok(())
 }

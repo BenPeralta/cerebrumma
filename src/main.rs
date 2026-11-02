@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use rusqlite::ffi::sqlite3_auto_extension;
+use rusqlite::auto_extension::{register_auto_extension, RawAutoExtension};
 use sqlite_vec::sqlite3_vec_init;
 
 pub mod cli;
@@ -25,16 +25,12 @@ use vector::{run_embed, run_search, run_why};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Register sqlite-vec extension globally
+    // sqlite-vec's Rust binding declares an untyped init symbol. rusqlite 0.41
+    // registers that pointer as a raw auto-extension.
     unsafe {
-        sqlite3_auto_extension(Some(std::mem::transmute::<
-            *const (),
-            unsafe extern "C" fn(
-                *mut rusqlite::ffi::sqlite3,
-                *mut *const i8,
-                *const rusqlite::ffi::sqlite3_api_routines,
-            ) -> i32,
-        >(sqlite3_vec_init as *const ())));
+        let init =
+            std::mem::transmute::<unsafe extern "C" fn(), RawAutoExtension>(sqlite3_vec_init);
+        register_auto_extension(init)?;
     }
 
     let cli = Cli::parse();
