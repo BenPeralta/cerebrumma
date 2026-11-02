@@ -17,24 +17,45 @@ use cli::{Cli, Commands, HookAction};
 use config::{run_config, run_stats};
 use daemon::run_daemon_cmd;
 use dreamer::dream_cycle;
-use git::{hook_install, hook_remove};
+use git::{hook_entry_from_env, hook_install, hook_remove};
 use governance::{publish_runtime, run_validate};
 use memory::{add_entry, init_brain, resolve_brain};
 use ui::{handle_template, run_audit, run_brief, run_fix, run_map, show_status};
-use vector::{run_search, run_why};
+use vector::{run_embed, run_search, run_why};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // Register sqlite-vec extension globally
     unsafe {
-        sqlite3_auto_extension(Some(std::mem::transmute(sqlite3_vec_init as *const ())));
+        sqlite3_auto_extension(Some(std::mem::transmute::<
+            *const (),
+            unsafe extern "C" fn(
+                *mut rusqlite::ffi::sqlite3,
+                *mut *const i8,
+                *const rusqlite::ffi::sqlite3_api_routines,
+            ) -> i32,
+        >(sqlite3_vec_init as *const ())));
     }
 
     let cli = Cli::parse();
 
     match cli.command {
         Commands::Init { global } => init_brain(resolve_brain(global)),
-        Commands::Add { content, global } => add_entry(content, resolve_brain(global)).await,
+        Commands::Add {
+            content,
+            global,
+            from_hook,
+        } => {
+            if from_hook && content.is_some() {
+                anyhow::bail!("pass either memory text or --from-hook, not both");
+            }
+            let content = if from_hook {
+                hook_entry_from_env()?
+            } else {
+                content.ok_or_else(|| anyhow::anyhow!("missing memory text"))?
+            };
+            add_entry(content, resolve_brain(global)).await
+        }
         Commands::Status => show_status(),
         Commands::Template { list, apply } => handle_template(list, apply),
         Commands::Watch => daemon::watch_daemon().await,
@@ -46,7 +67,7 @@ async fn main() -> Result<()> {
         Commands::Audit => run_audit(),
         Commands::Config { action } => run_config(action),
         Commands::Why { query } => run_why(&query),
-        Commands::Search { query } => run_search(&query),
+        Commands::Search { query, json, limit } => run_search(&query, json, limit),
         Commands::Fix => run_fix(),
         Commands::Map { graph } => run_map(graph),
         Commands::Daemon { action } => run_daemon_cmd(action),
@@ -54,5 +75,6 @@ async fn main() -> Result<()> {
         Commands::Stats => run_stats(),
         Commands::Validate { json } => run_validate(json),
         Commands::Publish { output } => publish_runtime(output),
+        Commands::Embed { brain, file } => run_embed(&brain, &file),
     }
 }

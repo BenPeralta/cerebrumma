@@ -1,15 +1,16 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use colored::*;
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use rusqlite::{params, Connection};
 use serde::Serialize;
 use std::collections::HashSet;
 use std::fs;
-use std::path::PathBuf;
+use std::io::Read;
+use std::path::Path;
 
-use crate::memory::active_brain;
+use crate::memory::{active_brain, global_brain_path, local_brain_path};
 
-pub fn init_vector_db(brain: &PathBuf) -> Result<()> {
+pub fn init_vector_db(brain: &Path) -> Result<()> {
     let db_path = brain.join("embeddings.db");
     let conn = Connection::open(db_path)?;
 
@@ -53,7 +54,7 @@ pub fn get_embedding(text: &str) -> Result<Vec<f32>> {
     Ok(embeddings[0].clone())
 }
 
-pub fn store_vector(brain: &PathBuf, content: &str, path: &str) -> Result<()> {
+pub fn store_vector(brain: &Path, content: &str, path: &str) -> Result<()> {
     let db_path = brain.join("embeddings.db");
     let _ = init_vector_db(brain); // Ensure tables exist
     let conn = Connection::open(db_path)?;
@@ -76,60 +77,171 @@ pub fn store_vector(brain: &PathBuf, content: &str, path: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn run_search(query: &str) -> Result<()> {
+#[derive(Serialize)]
+struct SearchHit {
+    brain: String,
+    path: String,
+    content: String,
+    distance: f32,
+}
+
+#[derive(Serialize)]
+struct SearchResponse {
+    ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<String>,
+    results: Vec<SearchHit>,
+}
+
+fn brain_label(brain: &Path) -> String {
+    if brain == global_brain_path() {
+        "global".to_string()
+    } else {
+        "local".to_string()
+    }
+}
+
+fn query_index(brain: &Path, query_json: &str, k: usize) -> Result<Vec<SearchHit>> {
+    let db_path = brain.join("embeddings.db");
+    if !db_path.exists() {
+        return Ok(vec![]);
+    }
+    let conn = Connection::open(db_path)?;
+    // `k` is a sqlite-vec constraint and is interpolated only after clamping to 1..=20.
+    let sql = format!(
+        "SELECT items.content, items.path, distance
+         FROM vec_items
+         JOIN items ON items.rowid = vec_items.rowid
+         WHERE embedding MATCH ?
+         AND k = {k}
+         ORDER BY distance"
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let label = brain_label(brain);
+    let rows = stmt.query_map(params![query_json], |row| {
+        Ok(SearchHit {
+            brain: label.clone(),
+            content: row.get(0)?,
+            path: row.get(1)?,
+            distance: row.get(2)?,
+        })
+    })?;
+    rows.collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(Into::into)
+}
+
+fn search_hits(query: &str, limit: usize) -> Result<SearchResponse> {
+    let limit = limit.clamp(1, 20);
+    let mut brains = Vec::new();
+    let local = local_brain_path();
+    let global = global_brain_path();
+    if local.exists() {
+        brains.push(local);
+    }
+    if global.exists() && !brains.iter().any(|b| b == &global) {
+        brains.push(global);
+    }
+    if brains.is_empty() {
+        return Ok(SearchResponse {
+            ok: false,
+            reason: Some("no_brain".to_string()),
+            results: vec![],
+        });
+    }
+    let indexed = brains
+        .iter()
+        .any(|brain| brain.join("embeddings.db").exists());
+    if !indexed {
+        return Ok(SearchResponse {
+            ok: false,
+            reason: Some("no_index".to_string()),
+            results: vec![],
+        });
+    }
+
+    let query_embedding = get_embedding(query)?;
+    let query_json = serde_json::to_string(&query_embedding)?;
+    let mut hits = Vec::new();
+    for brain in &brains {
+        hits.extend(query_index(brain, &query_json, limit)?);
+    }
+    hits.sort_by(|a, b| {
+        a.distance
+            .partial_cmp(&b.distance)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    hits.truncate(limit);
+    Ok(SearchResponse {
+        ok: true,
+        reason: None,
+        results: hits,
+    })
+}
+
+pub fn run_search(query: &str, json: bool, limit: usize) -> Result<()> {
+    let response = search_hits(query, limit)?;
+    if json {
+        println!("{}", serde_json::to_string(&response)?);
+        return Ok(());
+    }
+
+    if !response.ok {
+        bail!(
+            "{}",
+            match response.reason.as_deref() {
+                Some("no_index") => "Vector database not found. Try adding some entries first.",
+                _ => "No Brain found.",
+            }
+        );
+    }
+
     println!(
         "{} Semantic search for '{}'...",
         "→".bright_magenta(),
         query.yellow()
     );
-
-    let brain = active_brain().ok_or_else(|| anyhow::anyhow!("No Brain found."))?;
-
-    let db_path = brain.join("embeddings.db");
-    if !db_path.exists() {
-        anyhow::bail!("Vector database not found. Try adding some entries first.");
-    }
-
-    let conn = Connection::open(db_path)?;
-
-    let query_embedding = get_embedding(query)?;
-    let query_json = serde_json::to_string(&query_embedding)?;
-
-    let mut stmt = conn.prepare(
-        "SELECT items.content, items.path, distance 
-         FROM vec_items 
-         JOIN items ON items.rowid = vec_items.rowid
-         WHERE embedding MATCH ? 
-         AND k = 5
-         ORDER BY distance",
-    )?;
-
-    let rows = stmt.query_map(params![query_json], |row| {
-        Ok((
-            row.get::<_, String>(0)?,
-            row.get::<_, String>(1)?,
-            row.get::<_, f32>(2)?,
-        ))
-    })?;
-
     println!();
-    let mut count = 0;
-    for row in rows {
-        let (content, path, distance) = row?;
-        count += 1;
-        println!(
-            "  {} {} (distance: {:.4})",
-            count.to_string().green(),
-            path.dimmed(),
-            distance
-        );
-        println!("    {}\n", content.lines().next().unwrap_or("").trim());
-    }
-
-    if count == 0 {
+    if response.results.is_empty() {
         println!("   {} No matches found.", "→".dimmed());
+        return Ok(());
+    }
+    for (count, hit) in response.results.iter().enumerate() {
+        println!(
+            "  {} {} {} (distance: {:.4})",
+            (count + 1).to_string().green(),
+            hit.brain.dimmed(),
+            hit.path.dimmed(),
+            hit.distance
+        );
+        println!("    {}\n", hit.content.lines().next().unwrap_or("").trim());
+    }
+    Ok(())
+}
+
+/// Index content from stdin against a memory file that already lives in the brain.
+pub fn run_embed(brain: &Path, file: &Path) -> Result<()> {
+    if !brain.exists() {
+        bail!("brain not found: {}", brain.display());
+    }
+    let brain = brain.canonicalize()?;
+    if !file.exists() {
+        bail!("memory file not found: {}", file.display());
+    }
+    let file = file.canonicalize()?;
+    if !file.starts_with(&brain) {
+        bail!("refusing to index a file outside the brain");
     }
 
+    let mut content = String::new();
+    std::io::stdin().read_to_string(&mut content)?;
+    if content.len() > 512 * 1024 {
+        bail!("content exceeds 512 KiB");
+    }
+    if content.trim().is_empty() {
+        bail!("empty content");
+    }
+    store_vector(&brain, &content, &file.to_string_lossy())?;
+    println!("indexed {}", file.display());
     Ok(())
 }
 
@@ -281,7 +393,7 @@ fn cosine(a: &[f32], b: &[f32]) -> f32 {
 }
 
 /// Read every stored vector, then connect each node to its most similar peers.
-pub fn build_graph_data(brain: &PathBuf) -> Result<GraphData> {
+pub fn build_graph_data(brain: &Path) -> Result<GraphData> {
     let db_path = brain.join("embeddings.db");
     if !db_path.exists() {
         anyhow::bail!("Vector database not found. Try adding some entries first.");
@@ -309,8 +421,10 @@ pub fn build_graph_data(brain: &PathBuf) -> Result<GraphData> {
     for row in rows {
         let (content, path, bytes) = row?;
         let emb: Vec<f32> = bytes
-            .chunks_exact(4)
-            .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|c| f32::from_le_bytes(*c))
             .collect();
         if emb.is_empty() {
             continue;
