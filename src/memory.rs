@@ -118,6 +118,7 @@ pub fn init_brain(path: PathBuf) -> Result<()> {
         "memory/brand/examples",
         "memory/objectives/company",
         "memory/objectives/roles",
+        "memory/design",
         "embeddings",
         "logs",
         "dream",

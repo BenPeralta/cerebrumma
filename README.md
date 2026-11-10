@@ -71,7 +71,7 @@ cerebrum publish
 
 ## How It Works
 
-Memory lives in five layers inside `.cerebrum/`:
+Memory lives in layers inside `.cerebrum/`:
 
 ```
 .cerebrum/
@@ -81,12 +81,13 @@ Memory lives in five layers inside `.cerebrum/`:
 │   ├── procedural/     ← skills and protocols (rules you follow)
 │   ├── personal/       ← equity rules and preferences
 │   ├── brand/          ← voice rules and approved examples
-│   └── objectives/     ← company and role goals
+│   ├── objectives/     ← company and role goals
+│   └── design/         ← named mood boards (palette, type, spacing)
 ├── runtime/
 │   └── brain.json      ← validated snapshot consumed by agents
 ├── embeddings.db       ← local vector index (sqlite-vec)
 ├── logs/               ← audit trail
-└── dream/              ← reflection staging area
+└── dream/              ← reflection staging area, including design proposals
 ```
 
 Every entry is plain Markdown with YAML frontmatter — human-readable, git-diffable, no database.
@@ -115,6 +116,7 @@ Every entry is plain Markdown with YAML frontmatter — human-readable, git-diff
 | `cerebrum validate` | Detect conflicts, stale approvals, and unsafe runtime knowledge |
 | `cerebrum publish` | Produce a deterministic, versioned runtime snapshot for agents |
 | `cerebrum config` | Set LLM provider, model, and API keys |
+| `cerebrum design` | Add, list, mix, export, and approve mood boards |
 
 ## Global + Local Brain Hierarchy
 
@@ -142,9 +144,11 @@ Cerebrumma runs as a local MCP server. Claude Code, Cursor, and Antigravity can 
 }
 ```
 
-Available MCP tools: `read_memory` · `search_memory` · `get_protocols` · `add_entry` · `get_status` · `get_business_context`
+Available MCP tools: `read_memory` · `search_memory` · `get_protocols` · `add_entry` · `get_status` · `get_business_context` · `get_design` · `list_designs`
 
 `get_business_context` reads only the validated runtime snapshot. It filters knowledge by agent role and customer-safety classification, and returns the exact Brain version and memory IDs used so every consequential action can be audited.
+
+`get_design` returns the default mood board (or a named one) as tokens plus guidance for coding agents. `list_designs` lists project and global boards. Omit `board` to use the default. Pass `palette` and `typography` to mix one board's colors with another's type.
 
 ## Governed Business Brain
 
@@ -162,6 +166,38 @@ cerebrum publish
 ```
 
 Dream-generated insights cannot become approved runtime truth without an explicit human reviewer. See [Business Brain governance](docs/business-brain.md) for the schema, conflict rules, and controlled learning flow.
+
+## Design taste
+
+Mood boards live in `memory/design/<slug>.md`: Markdown with YAML frontmatter, schema `cerebrumma.design-board.v1`. A project board with the same slug replaces the global one. One board can be the default. Dream may notice taste and write a proposal under `dream/design-proposals/`; it does not change a board until you apply that proposal with `--approve`.
+
+```sh
+cerebrum design add \
+  --name "Warm Editorial" \
+  --description "Warm paper, ink, and one terracotta accent." \
+  --color background=#F6F1E8 \
+  --color surface=#FFFBF6 \
+  --color ink=#1C1917 \
+  --color accent=#C2410C \
+  --family display=Fraunces \
+  --family body="Source Serif 4" \
+  --scale base=1rem \
+  --weight regular=400 \
+  --space 4=1rem \
+  --radius md=10px \
+  --motion calm \
+  --vibe "Quiet editorial. One accent." \
+  --default
+
+cerebrum design list
+cerebrum design show warm-editorial --palette night-studio --type warm-editorial
+cerebrum design export --format css
+cerebrum design export --format tailwind -o tailwind.theme.js
+cerebrum design export --format json -o tokens.json
+cerebrum design export --format swiftui -o MoodBoard.swift
+```
+
+The schema, merge rules, and the JSON shape mockitup should match are in [docs/design-layer.md](docs/design-layer.md). A full example board is [templates/design-board.md](templates/design-board.md).
 
 ## Dream Cycle (Autopilot Gardener)
 
@@ -187,7 +223,7 @@ cerebrum dream --auto                 # runs reflection right now
 cerebrum daemon start                 # triggers automatically after 10 saturation points
 ```
 
-The LLM reflection is parsed into four sections:
+The LLM reflection is parsed into five sections:
 
 | Section | Destination |
 |---|---|
@@ -195,6 +231,7 @@ The LLM reflection is parsed into four sections:
 | New Rules | `procedural/skills/` |
 | Equity & Bias Notes | `personal/` |
 | Prune Suggestions | Viewed later using `cerebrum fix` |
+| Design Taste | `dream/design-proposals/` (not applied until you approve) |
 
 ## Memory Format
 
@@ -214,7 +251,8 @@ Always prefer functional components in React.
 
 - [x] CLI: `init`, `add`, `status`, `hook`, `watch`, `dream`, `map`, `fix`, `brief`
 - [x] Global + local Brain hierarchy
-- [x] MCP server (6 tools, including role-scoped business context)
+- [x] MCP server (8 tools, including role-scoped business context and design tokens)
+- [x] Design-taste layer — named mood boards, mix, and export
 - [x] Git hook auto-capture (branch + hash + diff stats)
 - [x] Autopilot Dreaming (`dream --auto`) via Gemini/Claude
 - [x] Background Daemon (`launchd`)
