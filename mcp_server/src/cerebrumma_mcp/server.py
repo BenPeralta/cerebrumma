@@ -5,6 +5,8 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
+from .design_layer import index_designs, load_boards, resolve_design
+
 mcp = FastMCP("cerebrumma")
 
 _LOCAL = Path(".cerebrum")
@@ -25,6 +27,7 @@ _LAYER_ALLOWLIST = {
     "brand/examples",
     "objectives/company",
     "objectives/roles",
+    "design",
 }
 
 
@@ -400,6 +403,7 @@ def get_status() -> str:
         ("skills", "memory/procedural/skills"),
         ("protocols", "memory/procedural/protocols"),
         ("personal", "memory/personal"),
+        ("design", "memory/design"),
     ]
     result = {}
     for brain in brain_paths():
@@ -410,6 +414,63 @@ def get_status() -> str:
             counts[name] = len(list(p.glob("*.md"))) if p.exists() else 0
         result[label] = counts
     return json.dumps(result, indent=2)
+
+
+def _design_brains() -> list[tuple[str, Path]]:
+    return [
+        ("local" if brain == _LOCAL else "global", brain)
+        for brain in brain_paths()
+    ]
+
+
+@mcp.tool()
+def get_design(
+    board: str = "",
+    palette: str = "",
+    typography: str = "",
+    spacing: str = "",
+    radius: str = "",
+    elevation: str = "",
+    motion: str = "",
+) -> str:
+    """Return design tokens and coding guidance for a mood board.
+
+    When board is omitted, the default board is used. palette, typography,
+    spacing, radius, elevation, and motion borrow that facet from another
+    board. Elevation uses the other board's shadows.
+
+    Args:
+        board: Board slug or unique name. Omit for the default board.
+        palette: Board whose palette replaces the base palette.
+        typography: Board whose type replaces the base typography.
+        spacing: Board whose spacing scale replaces the base scale.
+        radius: Board whose radius replaces the base radius.
+        elevation: Board whose shadows replace the base shadows.
+        motion: Board whose motion replaces the base motion.
+    """
+    ensure_brain()
+    resolved = resolve_design(
+        load_boards(_design_brains()),
+        board,
+        palette,
+        typography,
+        spacing,
+        radius,
+        elevation,
+        motion,
+    )
+    return json.dumps(resolved, indent=2)
+
+
+@mcp.tool()
+def list_designs() -> str:
+    """List named mood boards from the local and global Brains.
+
+    Local boards replace global boards of the same slug. effective_default
+    is the board get_design uses when no board is named.
+    """
+    ensure_brain()
+    return json.dumps(index_designs(load_boards(_design_brains())), indent=2)
 
 
 def run() -> None:

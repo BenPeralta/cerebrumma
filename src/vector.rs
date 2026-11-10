@@ -367,6 +367,8 @@ fn classify_layer(path: &str) -> (&'static str, &'static str) {
         ("Procedural", "#4ade80") // green
     } else if p.contains("personal") || p.contains("equity") {
         ("Personal", "#f472b6") // pink
+    } else if p.contains("memory/design") || p.contains("/design/") {
+        ("Design", "#f59e0b") // amber
     } else if p.contains("dream") || p.contains("audit") {
         ("Reflection", "#fbbf24") // amber
     } else {

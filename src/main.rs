@@ -6,6 +6,7 @@ use sqlite_vec::sqlite3_vec_init;
 pub mod cli;
 pub mod config;
 pub mod daemon;
+pub mod design;
 pub mod dreamer;
 pub mod git;
 pub mod governance;
@@ -16,6 +17,7 @@ pub mod vector;
 use cli::{Cli, Commands, HookAction};
 use config::{run_config, run_stats};
 use daemon::run_daemon_cmd;
+use design::run_design;
 use dreamer::dream_cycle;
 use git::{hook_entry_from_env, hook_install, hook_remove};
 use governance::{publish_runtime, run_validate};
@@ -76,5 +78,6 @@ async fn main() -> Result<()> {
         Commands::Validate { json } => run_validate(json),
         Commands::Publish { output } => publish_runtime(output),
         Commands::Embed { brain, file } => run_embed(&brain, &file),
+        Commands::Design { action } => run_design(*action),
     }
 }

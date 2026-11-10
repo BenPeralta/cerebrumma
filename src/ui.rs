@@ -2,6 +2,7 @@ use anyhow::Result;
 use colored::*;
 use std::fs;
 
+use crate::design::brief_section;
 use crate::dreamer::parse_reflection_sections;
 use crate::git::{get_current_branch, get_git_status};
 use crate::memory::{
@@ -40,6 +41,7 @@ pub fn show_status() -> Result<()> {
         ("Skills", "memory/procedural/skills"),
         ("Protocols", "memory/procedural/protocols"),
         ("Personal / Equity", "memory/personal"),
+        ("Design", "memory/design"),
     ];
 
     let print_brain = |label: &str, path: &std::path::PathBuf| {
@@ -234,6 +236,14 @@ pub fn run_brief() -> Result<()> {
     let latest_rules =
         get_latest_content(brain.join("memory/procedural/skills")).unwrap_or_default();
     let latest_equity = get_latest_content(brain.join("memory/personal")).unwrap_or_default();
+    let local_brain = local.exists().then_some(local.as_path());
+    let global_brain = global.exists().then_some(global.as_path());
+    let design = brief_section(local_brain, global_brain);
+    let design_block = if design.is_empty() {
+        "\n".to_string()
+    } else {
+        format!("\n{design}\n")
+    };
 
     let brief = format!(
         r#"# Session Brief: Catch Me Up
@@ -247,7 +257,7 @@ You are joining an active coding session. Here is the current state of the proje
 
 ## Equity & Bias Context
 {equity}
-
+{design_block}
 ## Recent Changes (Last 5 events)
 {recent}
 
@@ -263,6 +273,7 @@ You are joining an active coding session. Here is the current state of the proje
         insights = latest_insights,
         rules = latest_rules,
         equity = latest_equity,
+        design_block = design_block,
         recent = recent,
         branch = get_current_branch().unwrap_or_else(|_| "unknown".to_string()),
         status = get_git_status().unwrap_or_else(|_| "unknown".to_string())

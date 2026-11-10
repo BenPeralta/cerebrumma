@@ -228,6 +228,14 @@ fn load_candidates(brain: &Path) -> (Vec<Candidate>, Vec<ValidationIssue>) {
         {
             continue;
         }
+        // Mood boards are taste, not business truth, even if a file copies
+        // governance keys into its frontmatter.
+        if path
+            .strip_prefix(&memory)
+            .is_ok_and(|relative| relative.starts_with("design"))
+        {
+            continue;
+        }
         match parse_candidate(brain, path) {
             Ok(Some(candidate)) => candidates.push(candidate),
             Ok(None) => {}
@@ -665,6 +673,30 @@ mod tests {
             .issues
             .iter()
             .any(|issue| issue.code == "cross_key_supersedes"));
+    }
+
+    #[test]
+    fn design_boards_are_not_treated_as_business_truth() {
+        let brain = std::env::temp_dir().join(format!(
+            "cerebrum-design-gov-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let path = brain.join("memory/design/warm-editorial.md");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(
+            &path,
+            "---\nid: warm\nruntime: true\nstatus: approved\nauthority: brand_voice\n\
+             owner: founder\nscope: [design]\nautonomy_level: act\ncustomer_safe: true\n---\n\n\
+             Use warm paper.\n",
+        )
+        .unwrap();
+        let report = validate_brain(&brain);
+        fs::remove_dir_all(&brain).unwrap();
+        assert!(report.valid, "{:?}", report.issues);
+        assert_eq!(report.governed_entries, 0);
     }
 
     #[test]
